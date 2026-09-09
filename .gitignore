@@ -1,0 +1,4 @@
+.cache/
+__pycache__/
+# Vendor prices are private research inputs, not redistributed in Git.
+data/market/

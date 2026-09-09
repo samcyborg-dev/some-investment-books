@@ -1,0 +1,409 @@
+{
+  "date": "2026-09-08",
+  "output": "STRATEGY_1_ORB_FORENSIC_RESEARCH.pdf",
+  "page_count": 49,
+  "python": "3.11.2",
+  "layout": [
+    {
+      "page": 2,
+      "id": "brief",
+      "used_points": 554.1,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 3,
+      "id": "contents",
+      "used_points": 706.25,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 4,
+      "id": "corrections",
+      "used_points": 638.45,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 5,
+      "id": "meaning",
+      "used_points": 554.85,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 6,
+      "id": "mechanism",
+      "used_points": 594.1,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 7,
+      "id": "math",
+      "used_points": 700.8,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 8,
+      "id": "rulebook",
+      "used_points": 652.4,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 9,
+      "id": "session",
+      "used_points": 580.7,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 10,
+      "id": "indicators",
+      "used_points": 573.15,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 11,
+      "id": "chronology",
+      "used_points": 652.9,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 12,
+      "id": "exits",
+      "used_points": 647.6,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 13,
+      "id": "sizing",
+      "used_points": 634.45,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 14,
+      "id": "long",
+      "used_points": 665.3,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 15,
+      "id": "failed",
+      "used_points": 662.6,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 16,
+      "id": "evidence",
+      "used_points": 710.65,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 17,
+      "id": "stocks-method",
+      "used_points": 580.6,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 18,
+      "id": "stocks-results",
+      "used_points": 667.75,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 19,
+      "id": "stocks-critique",
+      "used_points": 590.4,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 20,
+      "id": "qqq-method",
+      "used_points": 625.8,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 21,
+      "id": "qqq-audit",
+      "used_points": 635.25,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 22,
+      "id": "spy",
+      "used_points": 603.55,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 23,
+      "id": "mechanisms-literature",
+      "used_points": 595.75,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 24,
+      "id": "contrary",
+      "used_points": 618.25,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 25,
+      "id": "regimes",
+      "used_points": 648.25,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 26,
+      "id": "failures",
+      "used_points": 632.4,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 27,
+      "id": "dd-definitions",
+      "used_points": 672.25,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 28,
+      "id": "dd-periods",
+      "used_points": 716.59,
+      "available_points": 728.89,
+      "body_font_pt": 9.849,
+      "scale": 0.98
+    },
+    {
+      "page": 29,
+      "id": "streaks",
+      "used_points": 705.81,
+      "available_points": 728.89,
+      "body_font_pt": 9.849,
+      "scale": 0.98
+    },
+    {
+      "page": 30,
+      "id": "challenge",
+      "used_points": 727.89,
+      "available_points": 728.89,
+      "body_font_pt": 9.648,
+      "scale": 0.96
+    },
+    {
+      "page": 31,
+      "id": "trade-metrics",
+      "used_points": 724.0,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 32,
+      "id": "portfolio-metrics",
+      "used_points": 722.0,
+      "available_points": 728.89,
+      "body_font_pt": 9.849,
+      "scale": 0.98
+    },
+    {
+      "page": 33,
+      "id": "inference",
+      "used_points": 678.9,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 34,
+      "id": "parameters",
+      "used_points": 658.5,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 35,
+      "id": "lab-design",
+      "used_points": 636.1,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 36,
+      "id": "lab-grid",
+      "used_points": 727.26,
+      "available_points": 728.89,
+      "body_font_pt": 9.648,
+      "scale": 0.96
+    },
+    {
+      "page": 37,
+      "id": "lab-stress",
+      "used_points": 708.93,
+      "available_points": 728.89,
+      "body_font_pt": 9.648,
+      "scale": 0.96
+    },
+    {
+      "page": 38,
+      "id": "audit-execution",
+      "used_points": 678.25,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 39,
+      "id": "audit-statistics",
+      "used_points": 703.5,
+      "available_points": 728.89,
+      "body_font_pt": 9.648,
+      "scale": 0.96
+    },
+    {
+      "page": 40,
+      "id": "validation",
+      "used_points": 681.05,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 41,
+      "id": "operations",
+      "used_points": 712.67,
+      "available_points": 728.89,
+      "body_font_pt": 9.849,
+      "scale": 0.98
+    },
+    {
+      "page": 42,
+      "id": "journal",
+      "used_points": 716.89,
+      "available_points": 728.89,
+      "body_font_pt": 9.246,
+      "scale": 0.92
+    },
+    {
+      "page": 43,
+      "id": "pine",
+      "used_points": 706.58,
+      "available_points": 728.89,
+      "body_font_pt": 9.246,
+      "scale": 0.92
+    },
+    {
+      "page": 44,
+      "id": "decision",
+      "used_points": 705.18,
+      "available_points": 728.89,
+      "body_font_pt": 9.246,
+      "scale": 0.92
+    },
+    {
+      "page": 45,
+      "id": "refs-a",
+      "used_points": 553.3,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 46,
+      "id": "refs-b",
+      "used_points": 607.3,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 47,
+      "id": "refs-c",
+      "used_points": 720.12,
+      "available_points": 728.89,
+      "body_font_pt": 9.849,
+      "scale": 0.98
+    },
+    {
+      "page": 48,
+      "id": "refs-d",
+      "used_points": 685.25,
+      "available_points": 728.89,
+      "body_font_pt": 10.05,
+      "scale": 1.0
+    },
+    {
+      "page": 49,
+      "id": "reproducibility",
+      "used_points": 721.97,
+      "available_points": 728.89,
+      "body_font_pt": 9.447,
+      "scale": 0.94
+    }
+  ],
+  "dependencies": {
+    "reportlab": "5.0.1",
+    "pillow": "12.3.0",
+    "numpy": "2.4.6",
+    "matplotlib": "3.11.1",
+    "pandas": "3.0.5",
+    "pymupdf": "1.28.2"
+  },
+  "sha256": {
+    "STRATEGY_1_ORB_FORENSIC_RESEARCH.pdf": "c3d7985115425b16b84b6fbb6d27ff411ea810315198364615922f3ce8e44ae2",
+    "research/strategy_1/report.md": "0212d47cf91e873f0a2b0a41e61e536135618dddd4ce6d7ca876c7663c8d30b8",
+    "research/strategy_1/sources.json": "5b38ca2408649253c18157c697837c2e208bcd34d83f9e75bc207d697f48bb56",
+    "research/strategy_1/calculate_examples.py": "bab9ca3a4eb7bf8b24340c62ba401bd883b966f57be34d4fb85f6a5f1bda8b48",
+    "research/strategy_1/illustrative_results.json": "b65049f380c13e9e301968789ac2d956c27917d061380180402d34a8221799a2",
+    "research/strategy_1/build_pdf.py": "9040cc46d16b7f68944892c8eefe41c0eec1309c5651d21a4d3d1d475ba47b03",
+    "research/strategy_1/test_research.py": "eaf99f734eede6e62ccdb979cf3d3b04ce3b5af9656f82915ad955d54e729403"
+  }
+}

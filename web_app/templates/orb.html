@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#14252b" />
+    <meta
+      name="description"
+      content="An evidence-aware Opening Range Breakout research dashboard. Explore assumptions, published findings and your own trade records."
+    />
+    <title>Range Lab — Opening Range Breakout</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link
+      rel="preload"
+      href="/static/fonts/inter-latin-variable.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/static/orb.css" />
+    <link rel="stylesheet" href="/static/orb-market.css" />
+    <script type="module" src="/static/orb.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to dashboard</a>
+    <div class="sidebar-shade" data-action="close-menu" hidden></div>
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+      <a href="#overview" class="brand"
+        ><img src="/static/orb-mark.svg" width="36" height="36" alt="" /><span
+          >Range<span class="brand-light">Lab</span
+          ><small>STRATEGY RESEARCH</small></span
+        ></a
+      >
+      <div class="workspace">
+        <span class="workspace-icon">01</span
+        ><span>ORB research<small>ES / MES · US session</small></span
+        ><span class="workspace-tag">v0.1</span>
+      </div>
+      <p class="nav-label">WORKSPACE</p>
+      <nav>
+        <a class="nav-link active" href="#overview" data-route="overview"
+          ><svg class="icon"><use href="/static/orb-icons.svg#overview" /></svg
+          ><span>Overview</span></a
+        >
+        <a class="nav-link" href="#market" data-route="market"
+          ><svg class="icon"><use href="/static/orb-icons.svg#trend" /></svg
+          ><span>Market data & replay</span></a
+        >
+        <a class="nav-link" href="#lab" data-route="lab"
+          ><svg class="icon"><use href="/static/orb-icons.svg#lab" /></svg
+          ><span>Scenario lab</span><span class="nav-small">20k</span></a
+        >
+        <a class="nav-link" href="#research" data-route="research"
+          ><svg class="icon"><use href="/static/orb-icons.svg#book" /></svg
+          ><span>Research & evidence</span></a
+        >
+        <a class="nav-link" href="#trades" data-route="trades"
+          ><svg class="icon"><use href="/static/orb-icons.svg#trades" /></svg
+          ><span>Trade analytics</span></a
+        >
+        <a class="nav-link" href="#rules" data-route="rules"
+          ><svg class="icon"><use href="/static/orb-icons.svg#settings" /></svg
+          ><span>Strategy rulebook</span></a
+        >
+        <a class="nav-link" href="#journal" data-route="journal"
+          ><svg class="icon"><use href="/static/orb-icons.svg#journal" /></svg
+          ><span>Research journal</span></a
+        >
+      </nav>
+      <div class="nav-divider"></div>
+      <p class="nav-label">RESOURCES</p>
+      <button class="nav-link" data-action="report">
+        <svg class="icon"><use href="/static/orb-icons.svg#file" /></svg
+        ><span>Forensic dossier</span><span class="nav-small">49p</span>
+      </button>
+      <button class="nav-link" data-action="glossary">
+        <svg class="icon"><use href="/static/orb-icons.svg#help" /></svg
+        ><span>Metric glossary</span>
+      </button>
+      <div class="sidebar-bottom">
+        <div class="session-mini">
+          <div><span class="status-dot"></span>THE SESSION PLAN</div>
+          <strong>09:30 <span>—</span> 10:00 <small>ET</small></strong>
+          <p>Build the range. Trade the escape.</p>
+          <a href="#rules">See the full rulebook <span>↗</span></a>
+        </div>
+        <div class="research-status">
+          <svg class="icon"><use href="/static/orb-icons.svg#shield" /></svg>
+          <div>Research only<small>No live broker connection</small></div>
+        </div>
+      </div>
+    </aside>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="top-left">
+          <button
+            class="icon-button mobile-menu"
+            data-action="menu"
+            aria-label="Open navigation"
+            aria-expanded="false"
+            aria-controls="sidebar"
+          >
+            <svg class="icon">
+              <use href="/static/orb-icons.svg#menu" />
+            </svg></button
+          ><span class="breadcrumb"
+            >Strategies <span>/</span>
+            <strong>Opening Range Breakout</strong></span
+          >
+        </div>
+        <div class="top-actions">
+          <button class="search-trigger" data-action="glossary">
+            <svg class="icon"><use href="/static/orb-icons.svg#search" /></svg
+            ><span>Find a metric</span><kbd>⌘ K</kbd>
+          </button>
+          <span class="top-divider"></span>
+          <button
+            class="icon-button"
+            data-action="report"
+            aria-label="Read the research dossier"
+          >
+            <svg class="icon"><use href="/static/orb-icons.svg#book" /></svg>
+          </button>
+          <div class="avatar" title="ORB research workspace">OR</div>
+        </div>
+      </header>
+      <main id="main" tabindex="-1">
+        <div class="loading-screen">
+          <span class="loader"></span>
+          <h1>Opening your research workspace</h1>
+          <p>Loading the source registry and reproducible scenario results…</p>
+        </div>
+      </main>
+      <footer class="app-footer">
+        <span><span class="status-dot"></span>Evidence before execution.</span
+        ><span
+          >ORB-30R v0.1 <span class="footer-sep">·</span> Research snapshot: 08
+          Sep 2026</span
+        >
+      </footer>
+    </div>
+    <dialog id="detail-dialog" class="detail-dialog">
+      <div id="dialog-content"></div>
+    </dialog>
+    <div
+      class="toast-region"
+      id="toasts"
+      role="status"
+      aria-live="polite"
+    ></div>
+    <noscript
+      ><div class="noscript">
+        JavaScript is needed to explore the dashboard. The research manuscript
+        is available at
+        <a href="/api/orb/download/manuscript.md">Download manuscript</a>.
+      </div></noscript
+    >
+  </body>
+</html>

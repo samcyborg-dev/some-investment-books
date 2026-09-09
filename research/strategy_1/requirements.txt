@@ -1,0 +1,7 @@
+# Runtime versions used to build the September 2026 dossier. Python 3.11.
+reportlab==5.0.1
+pillow==12.3.0
+numpy==2.4.6
+pandas==3.0.5
+matplotlib==3.11.1
+pymupdf==1.28.2

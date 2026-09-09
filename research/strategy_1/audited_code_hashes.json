@@ -1,0 +1,12 @@
+{
+  "date": "2026-09-08",
+  "files": {
+    "optimize_strategy_1.py": "a9536ee810b3feb0dbc2454d7bd4e892e03a77465b0b6c8657f589e420481dbc",
+    "quant_engine/strategies/prop_volatility_breakout.py": "22f254dd2e01ba53dca56303cbbfd109a5b99539d38ff59455ce92987f1d8d1e",
+    "quant_engine/core/portfolio.py": "8277c0c82c8ab62baa44c20630f9854b7837e7320745729923c342f093542cc9",
+    "quant_engine/core/risk_manager.py": "235c94bd5a7a17a5580355eab5adfdc2507fc053259fa7ede87984a51aac752c",
+    "quant_engine/core/data_manager.py": "b32d2965bf6feaeecaeb7cff517ba220d4234f7eba28aaaf1cb3a526f490341f",
+    "quant_engine/analytics/ssrn_validation.py": "11c74a43089ad155aba6eed58af01d973cb5cb059360ee015e1bc49bbb2adbbf",
+    "quant_engine/analytics/performance_metrics.py": "1309ebba087e8ca5224fd939914a2c84c95c8cd83438115045c137eabab4c1bb"
+  }
+}

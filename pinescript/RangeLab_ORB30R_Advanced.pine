@@ -1,0 +1,345 @@
+//@version=6
+// RangeLab ORB-30R Advanced
+// Research implementation of the frozen ORB-30R proposal.
+// This script is for TradingView backtesting, paper testing and alerts only.
+// It does not place broker orders and does not establish that the strategy has an edge.
+strategy(
+     title = "RangeLab ORB-30R Advanced | Research",
+     shorttitle = "RangeLab ORB-30R",
+     overlay = true,
+     initial_capital = 100000,
+     currency = currency.USD,
+     pyramiding = 0,
+     default_qty_type = strategy.fixed,
+     default_qty_value = 1,
+     commission_type = strategy.commission.cash_per_contract,
+     commission_value = 5.0,
+     slippage = 1,
+     process_orders_on_close = false,
+     calc_on_order_fills = true,
+     calc_on_every_tick = false,
+     max_bars_back = 5000,
+     use_bar_magnifier = true
+ )
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inputs
+// ─────────────────────────────────────────────────────────────────────────────
+groupSession = "01 · Session and clock"
+groupRule    = "02 · Frozen ORB-30R rules"
+groupRisk    = "03 · Sizing and costs"
+groupDisplay = "04 · Display and diagnostics"
+
+string sessionTimezone = input.string("America/New_York", "Session timezone", options = ["America/New_York", "Etc/UTC"], group = groupSession)
+string rthSession      = input.session("0930-1600:23456", "Cash session", group = groupSession)
+string openingSession  = input.session("0930-1000:23456", "Opening range", group = groupSession)
+string entrySession    = input.session("1000-1330:23456", "Entry window", group = groupSession)
+string flatSignal      = input.session("1545-1550:23456", "Exit-order bar", group = groupSession)
+
+int emaFastLength      = input.int(20, "Fast EMA", minval = 1, group = groupRule)
+int emaSlowLength      = input.int(50, "Slow EMA", minval = 2, group = groupRule)
+int atrLength          = input.int(14, "Wilder ATR length", minval = 1, group = groupRule)
+int warmupRthBars      = input.int(250, "Completed RTH warm-up bars", minval = 20, group = groupRule)
+float rangeGateATR     = input.float(5.0, "Maximum range width × ATR", minval = 0.1, step = 0.1, group = groupRule)
+float entryTicks       = input.float(1.0, "Entry distance in ticks", minval = 0.0, step = 0.25, group = groupRule)
+float stopATR          = input.float(1.2, "Initial stop × ATR", minval = 0.1, step = 0.1, group = groupRule)
+float targetATR        = input.float(2.0, "Initial target × ATR", minval = 0.1, step = 0.1, group = groupRule)
+int maxTradesPerDay    = input.int(1, "Maximum fills per session", minval = 1, maxval = 1, group = groupRule)
+bool enableTrailing    = input.bool(false, "Enable separate trailing experiment", group = groupRule)
+float trailActivation  = input.float(1.8, "Trail activation × ATR", minval = 0.1, step = 0.1, group = groupRule)
+float trailDistance    = input.float(1.0, "Trailing distance × ATR", minval = 0.1, step = 0.1, group = groupRule)
+
+string instrument      = input.string("ES", "Sizing instrument", options = ["ES", "MES"], group = groupRisk)
+float pointValue       = instrument == "ES" ? 50.0 : 5.0
+float researchTick     = input.float(0.25, "Research tick size", minval = 0.00001, step = 0.25, group = groupRisk)
+float riskPct          = input.float(0.50, "Equity risk allowance (%)", minval = 0.01, maxval = 10.0, step = 0.01, group = groupRisk)
+int maxContracts       = input.int(1, "Maximum integer contracts", minval = 1, maxval = 100, group = groupRisk)
+float feeReserve       = input.float(5.0, "Round-trip fee reserve / contract ($)", minval = 0.0, step = 0.01, group = groupRisk)
+float slippageReserve  = input.float(1.0, "Slippage reserve per side (ticks)", minval = 0.0, step = 0.25, group = groupRisk)
+bool rejectIfUnaffordable = input.bool(true, "Skip if one integer contract exceeds risk", group = groupRisk)
+
+bool showOpeningRange  = input.bool(true, "Plot opening range", group = groupDisplay)
+bool showIndicators    = input.bool(false, "Plot RTH EMA20 / EMA50", group = groupDisplay)
+bool showStatusTable   = input.bool(true, "Show diagnostic table", group = groupDisplay)
+bool showSignals       = input.bool(true, "Show order and fill markers", group = groupDisplay)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+roundDown(float price, float step) =>
+    math.floor(price / step + 0.00000001) * step
+
+roundUp(float price, float step) =>
+    math.ceil(price / step - 0.00000001) * step
+
+inSession(string session) =>
+    not na(time(timeframe.period, session, sessionTimezone))
+
+// Calculate integer size from the frozen ATR and the prospective stop.
+calculateQuantity(float entryPrice, float frozenAtr, bool isLong) =>
+    float rawStop = isLong ? entryPrice - frozenAtr * stopATR : entryPrice + frozenAtr * stopATR
+    float roundedStop = isLong ? roundDown(rawStop, researchTick) : roundUp(rawStop, researchTick)
+    float priceRisk = math.abs(entryPrice - roundedStop)
+    float slippageDollars = 2.0 * slippageReserve * researchTick * pointValue
+    float riskPerContract = priceRisk * pointValue + feeReserve + slippageDollars
+    float riskBudget = strategy.equity * riskPct / 100.0
+    int affordable = riskPerContract > 0 ? int(math.floor(riskBudget / riskPerContract)) : 0
+    int sized = math.min(affordable, maxContracts)
+    rejectIfUnaffordable ? sized : math.max(sized, 1)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chart and session guards
+// ─────────────────────────────────────────────────────────────────────────────
+bool isFiveMinute = timeframe.isminutes and timeframe.multiplier == 5
+bool inRth = inSession(rthSession)
+bool inOpening = inSession(openingSession)
+bool inEntry = inSession(entrySession)
+bool isExitOrderBar = inSession(flatSignal)
+
+int currentSessionKey = year(time, sessionTimezone) * 10000 + month(time, sessionTimezone) * 100 + dayofmonth(time, sessionTimezone)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RTH-only causal indicators
+// ─────────────────────────────────────────────────────────────────────────────
+// These are deliberately updated only on RTH bars. The snapshots are taken
+// before the current bar is incorporated, so entry approval uses past data.
+var int rthBars = 0
+var float priorRthCloseState = na
+var float rthEmaFastState = na
+var float rthEmaSlowState = na
+var float rthAtrState = na
+
+float priorRthClose = priorRthCloseState
+float priorEmaFast = rthEmaFastState
+float priorEmaSlow = rthEmaSlowState
+float priorAtr = rthAtrState
+int priorRthBars = rthBars
+
+if inRth
+    float trueRange = na(priorRthCloseState) ? high - low : math.max(high - low, math.max(math.abs(high - priorRthCloseState), math.abs(low - priorRthCloseState)))
+    rthBars += 1
+    rthEmaFastState := na(rthEmaFastState) ? close : rthEmaFastState + (2.0 / (emaFastLength + 1.0)) * (close - rthEmaFastState)
+    rthEmaSlowState := na(rthEmaSlowState) ? close : rthEmaSlowState + (2.0 / (emaSlowLength + 1.0)) * (close - rthEmaSlowState)
+    rthAtrState := na(rthAtrState) ? trueRange : (rthAtrState * (atrLength - 1.0) + trueRange) / atrLength
+    priorRthCloseState := close
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Session state and opening range
+// ─────────────────────────────────────────────────────────────────────────────
+var int sessionKey = na
+var float rangeHigh = na
+var float rangeLow = na
+var bool rangeReady = false
+var bool tradedToday = false
+var int fillsToday = 0
+var int pendingSide = 0       // 1 = long stop, -1 = short stop
+var int pendingQuantity = 0
+var float pendingAtr = na
+var float pendingTrigger = na
+
+bool newSession = inRth and (na(sessionKey) or currentSessionKey != sessionKey)
+if newSession
+    sessionKey := currentSessionKey
+    rangeHigh := na
+    rangeLow := na
+    rangeReady := false
+    tradedToday := false
+    fillsToday := 0
+    pendingSide := 0
+    pendingQuantity := 0
+    pendingAtr := na
+    pendingTrigger := na
+    strategy.cancel("ORB-L")
+    strategy.cancel("ORB-S")
+
+if inOpening
+    rangeHigh := na(rangeHigh) ? high : math.max(rangeHigh, high)
+    rangeLow := na(rangeLow) ? low : math.min(rangeLow, low)
+
+// At the first 10:00 bar, the six completed opening-range bars are frozen.
+if inRth and not inOpening and not rangeReady and not na(rangeHigh) and not na(rangeLow)
+    rangeReady := true
+
+float rangeWidth = rangeReady ? rangeHigh - rangeLow : na
+bool rangeGatePass = rangeReady and not na(priorAtr) and rangeWidth > 0 and rangeWidth <= priorAtr * rangeGateATR
+bool warmupPass = priorRthBars >= warmupRthBars and not na(priorEmaFast) and not na(priorEmaSlow) and not na(priorAtr) and not na(priorRthClose)
+bool longTrend = warmupPass and priorRthClose > priorEmaFast and priorEmaFast > priorEmaSlow
+bool shortTrend = warmupPass and priorRthClose < priorEmaFast and priorEmaFast < priorEmaSlow
+
+float longTrigger = rangeReady ? roundUp(rangeHigh + entryTicks * researchTick, researchTick) : na
+float shortTrigger = rangeReady ? roundDown(rangeLow - entryTicks * researchTick, researchTick) : na
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Prospective one-tick stop entries and integer sizing
+// ─────────────────────────────────────────────────────────────────────────────
+var bool orderPlacedThisBar = false
+orderPlacedThisBar := false
+
+bool flat = strategy.position_size == 0
+bool noFillYet = not tradedToday and fillsToday < maxTradesPerDay
+bool canSeekEntry = isFiveMinute and inEntry and flat and noFillYet and rangeGatePass and warmupPass
+
+bool longNotAlreadyCrossed = not na(longTrigger) and high < longTrigger
+bool shortNotAlreadyCrossed = not na(shortTrigger) and low > shortTrigger
+
+// A stop order created on this bar becomes eligible from the next bar. If a
+// later bar has already crossed the trigger without a fill, cancel it rather
+// than pretending a historical fill occurred.
+if strategy.position_size != 0 and strategy.position_size[1] == 0
+    tradedToday := true
+    fillsToday += 1
+    pendingSide := 0
+    pendingQuantity := 0
+
+if flat and pendingSide != 0
+    bool pendingCrossed = pendingSide == 1 ? high >= pendingTrigger : low <= pendingTrigger
+    bool pendingStillAllowed = inEntry and noFillYet and rangeGatePass and warmupPass and (pendingSide == 1 ? longTrend : shortTrend)
+    if pendingCrossed or not pendingStillAllowed
+        strategy.cancel(pendingSide == 1 ? "ORB-L" : "ORB-S")
+        pendingSide := 0
+        pendingQuantity := 0
+        pendingAtr := na
+        pendingTrigger := na
+    else if pendingSide == 1
+        strategy.entry("ORB-L", strategy.long, qty = pendingQuantity, stop = pendingTrigger, comment = "ORB-30R long stop")
+    else
+        strategy.entry("ORB-S", strategy.short, qty = pendingQuantity, stop = pendingTrigger, comment = "ORB-30R short stop")
+
+if canSeekEntry and pendingSide == 0
+    if longTrend and longNotAlreadyCrossed
+        int quantity = calculateQuantity(longTrigger, priorAtr, true)
+        if quantity > 0
+            pendingSide := 1
+            pendingQuantity := quantity
+            pendingAtr := priorAtr
+            pendingTrigger := longTrigger
+            strategy.entry("ORB-L", strategy.long, qty = quantity, stop = longTrigger, comment = "ORB-30R long stop")
+            orderPlacedThisBar := true
+    else if shortTrend and shortNotAlreadyCrossed
+        int quantity = calculateQuantity(shortTrigger, priorAtr, false)
+        if quantity > 0
+            pendingSide := -1
+            pendingQuantity := quantity
+            pendingAtr := priorAtr
+            pendingTrigger := shortTrigger
+            strategy.entry("ORB-S", strategy.short, qty = quantity, stop = shortTrigger, comment = "ORB-30R short stop")
+            orderPlacedThisBar := true
+
+// Cancel at the close of the 13:25 bar so no entry order is active at 13:30.
+if inSession("1325-1330:23456") and pendingSide != 0 and flat
+    strategy.cancel(pendingSide == 1 ? "ORB-L" : "ORB-S")
+    pendingSide := 0
+    pendingQuantity := 0
+    pendingAtr := na
+    pendingTrigger := na
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bracket management: frozen ATR, rounded stop/target, optional experiment
+// ─────────────────────────────────────────────────────────────────────────────
+var float entryPrice = na
+var float initialStop = na
+var float targetPrice = na
+var float activeStop = na
+var float highSinceEntry = na
+var float lowSinceEntry = na
+var float frozenEntryAtr = na
+
+bool justEntered = strategy.position_size != 0 and strategy.position_size[1] == 0
+bool justExited = strategy.position_size == 0 and strategy.position_size[1] != 0
+
+if justEntered
+    entryPrice := strategy.position_avg_price
+    frozenEntryAtr := na(pendingAtr) ? priorAtr : pendingAtr
+    if strategy.position_size > 0
+        initialStop := roundDown(entryPrice - frozenEntryAtr * stopATR, researchTick)
+        targetPrice := roundDown(entryPrice + frozenEntryAtr * targetATR, researchTick)
+        highSinceEntry := high
+        lowSinceEntry := na
+    else
+        initialStop := roundUp(entryPrice + frozenEntryAtr * stopATR, researchTick)
+        targetPrice := roundUp(entryPrice - frozenEntryAtr * targetATR, researchTick)
+        lowSinceEntry := low
+        highSinceEntry := na
+    activeStop := initialStop
+
+if strategy.position_size > 0
+    highSinceEntry := na(highSinceEntry) ? high : math.max(highSinceEntry, high)
+    activeStop := initialStop
+    if enableTrailing and highSinceEntry >= entryPrice + frozenEntryAtr * trailActivation
+        activeStop := math.max(initialStop, roundDown(highSinceEntry - frozenEntryAtr * trailDistance, researchTick))
+    strategy.exit("ORB-L-X", from_entry = "ORB-L", stop = activeStop, limit = targetPrice, comment = "ORB bracket")
+
+if strategy.position_size < 0
+    lowSinceEntry := na(lowSinceEntry) ? low : math.min(lowSinceEntry, low)
+    activeStop := initialStop
+    if enableTrailing and lowSinceEntry <= entryPrice - frozenEntryAtr * trailActivation
+        activeStop := math.min(initialStop, roundUp(lowSinceEntry + frozenEntryAtr * trailDistance, researchTick))
+    strategy.exit("ORB-S-X", from_entry = "ORB-S", stop = activeStop, limit = targetPrice, comment = "ORB bracket")
+
+// The exit order is submitted on the 15:45 bar close and fills at the 15:50
+// bar open under process_orders_on_close=false. This requires a five-minute chart.
+if isFiveMinute and isExitOrderBar and strategy.position_size != 0
+    strategy.close_all(comment = "15:50 ET flat")
+
+if justExited
+    entryPrice := na
+    initialStop := na
+    targetPrice := na
+    activeStop := na
+    highSinceEntry := na
+    lowSinceEntry := na
+    frozenEntryAtr := na
+    pendingSide := 0
+    pendingQuantity := 0
+    pendingAtr := na
+    pendingTrigger := na
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Visual diagnostics
+// ─────────────────────────────────────────────────────────────────────────────
+plot(showOpeningRange and inRth ? rangeHigh : na, "Opening range high", color = color.new(color.teal, 0), linewidth = 2, style = plot.style_linebr)
+plot(showOpeningRange and inRth ? rangeLow : na, "Opening range low", color = color.new(color.orange, 0), linewidth = 2, style = plot.style_linebr)
+plot(showIndicators and inRth ? rthEmaFastState : na, "RTH EMA 20", color = color.new(color.blue, 0))
+plot(showIndicators and inRth ? rthEmaSlowState : na, "RTH EMA 50", color = color.new(color.purple, 0))
+plot(strategy.position_size != 0 ? activeStop : na, "Active stop", color = color.new(color.red, 0), style = plot.style_linebr)
+plot(strategy.position_size != 0 ? targetPrice : na, "Active target", color = color.new(color.green, 0), style = plot.style_linebr)
+
+bgcolor(inOpening ? color.new(color.teal, 91) : inEntry ? color.new(color.blue, 95) : na, title = "Research session shading")
+plotshape(showSignals and orderPlacedThisBar and pendingSide == 1, title = "Long order armed", style = shape.triangleup, location = location.belowbar, color = color.new(color.teal, 0), size = size.tiny, text = "L")
+plotshape(showSignals and orderPlacedThisBar and pendingSide == -1, title = "Short order armed", style = shape.triangledown, location = location.abovebar, color = color.new(color.orange, 0), size = size.tiny, text = "S")
+plotshape(showSignals and justEntered and strategy.position_size > 0, title = "Long fill", style = shape.circle, location = location.belowbar, color = color.new(color.green, 0), size = size.tiny, text = "Fill")
+plotshape(showSignals and justEntered and strategy.position_size < 0, title = "Short fill", style = shape.circle, location = location.abovebar, color = color.new(color.red, 0), size = size.tiny, text = "Fill")
+
+// Alerts are notifications only. They do not place live orders.
+alertcondition(orderPlacedThisBar and pendingSide == 1, "ORB long order armed", "RangeLab ORB-30R armed a long stop order. Verify the chart and broker before acting.")
+alertcondition(orderPlacedThisBar and pendingSide == -1, "ORB short order armed", "RangeLab ORB-30R armed a short stop order. Verify the chart and broker before acting.")
+alertcondition(justEntered, "ORB modeled fill", "RangeLab ORB-30R modeled a fill. This is a TradingView strategy event, not a broker execution confirmation.")
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Status table: makes assumptions visible on the chart
+// ─────────────────────────────────────────────────────────────────────────────
+var table status = table.new(position.top_right, 2, 11, border_width = 1)
+if showStatusTable and barstate.islast
+    bool tickMatches = math.abs(syminfo.mintick - researchTick) < researchTick * 0.01
+    table.cell(status, 0, 0, "RangeLab ORB-30R", text_color = color.white, bgcolor = color.rgb(24, 58, 59))
+    table.cell(status, 1, 0, "RESEARCH", text_color = color.rgb(185, 229, 215), bgcolor = color.rgb(24, 58, 59))
+    table.cell(status, 0, 1, "Chart", text_color = color.gray)
+    table.cell(status, 1, 1, isFiveMinute ? "5m ✓" : "Use 5m", text_color = isFiveMinute ? color.green : color.red)
+    table.cell(status, 0, 2, "Symbol", text_color = color.gray)
+    table.cell(status, 1, 2, syminfo.ticker, text_color = color.white)
+    table.cell(status, 0, 3, "Tick grid", text_color = color.gray)
+    table.cell(status, 1, 3, str.tostring(researchTick) + (tickMatches ? " ✓" : " · CHECK"), text_color = tickMatches ? color.green : color.red)
+    table.cell(status, 0, 4, "RTH bars", text_color = color.gray)
+    table.cell(status, 1, 4, str.tostring(rthBars) + " / " + str.tostring(warmupRthBars), text_color = warmupPass ? color.green : color.orange)
+    table.cell(status, 0, 5, "Range width", text_color = color.gray)
+    table.cell(status, 1, 5, na(rangeWidth) ? "—" : str.tostring(rangeWidth, format.mintick), text_color = rangeGatePass ? color.green : color.orange)
+    table.cell(status, 0, 6, "Trend gate", text_color = color.gray)
+    table.cell(status, 1, 6, longTrend ? "LONG" : shortTrend ? "SHORT" : "—", text_color = longTrend or shortTrend ? color.green : color.orange)
+    table.cell(status, 0, 7, "Session fills", text_color = color.gray)
+    table.cell(status, 1, 7, str.tostring(fillsToday) + " / " + str.tostring(maxTradesPerDay), text_color = fillsToday > 0 ? color.orange : color.green)
+    table.cell(status, 0, 8, "Sizing", text_color = color.gray)
+    table.cell(status, 1, 8, instrument + " · " + str.tostring(maxContracts) + " max", text_color = color.white)
+    table.cell(status, 0, 9, "Trailing", text_color = color.gray)
+    table.cell(status, 1, 9, enableTrailing ? "EXPERIMENT ON" : "Frozen baseline", text_color = enableTrailing ? color.orange : color.green)
+    table.cell(status, 0, 10, "Evidence", text_color = color.gray)
+    table.cell(status, 1, 10, "Not broker-validated", text_color = color.orange)

@@ -14,6 +14,12 @@ From a Chromebook, the practical options are:
 
 Do not paste the `.mq5` source into WebTerminal; it will not run there. If your broker offers a separate web export/API, its exact symbol and timestamp convention must be recorded before using the data.
 
+## Free Chromebook test route
+
+If you do not have a Windows desktop or VPS, run `RangeLab_Free_Colab_Exporter.ipynb` in Google Colab from Chrome. It installs the free `yfinance` package, downloads `ES=F` and `MES=F` separately, creates raw and regular-hours CSVs plus SHA-256 receipts, and downloads a ZIP to the Chromebook. The `*-rth.csv` files are shaped for the dashboard's price import after you review the receipt.
+
+This route does not use MT5 or broker history. yfinance documents that intraday intervals cannot extend beyond the most recent 60 days, so the notebook requests 59 days. It is suitable for a free smoke test only; it does not solve the long-window provenance requirement. Source documentation: <https://ranaroussi.github.io/yfinance/reference/api/yfinance.download.html>.
+
 ## What it exports
 
 Each row contains:

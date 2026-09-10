@@ -22,7 +22,7 @@ This is an advanced TradingView **strategy script for research, backtesting, pap
 - Integer ES/MES position sizing with an equity-risk allowance, fee reserve and slippage reserve.
 - Optional trailing-stop experiment, disabled by default and visibly marked when enabled.
 - Strategy commission and one-tick slippage properties.
-- Bar Magnifier enabled in the strategy declaration.
+- Free-plan-compatible strategy declaration with Bar Magnifier disabled.
 - Opening-range, indicator, stop, target, order, fill and status-table diagnostics.
 - Alert conditions that describe modeled events and explicitly warn that they are not broker fills.
 
@@ -57,7 +57,7 @@ The fee-reserve input is used for integer sizing. The actual TradingView strateg
 
 - A TradingView bar is not a broker fill. Alerts are notifications only unless separately connected and authorized.
 - The 15:50 open liquidation is modeled by submitting a close order on the 15:45 bar. Use a five-minute chart; other timeframes cannot represent the frozen timing exactly.
-- Bar Magnifier may improve historical intrabar sequencing when lower-timeframe data is available, but it does not provide a tick-level queue, exchange order book, broker margin model or guaranteed fill.
+- Bar Magnifier is intentionally disabled so the script runs on TradingView's free plan. A paid plan may allow a separate Bar Magnifier experiment, but that does not provide a tick-level queue, exchange order book, broker margin model or guaranteed fill.
 - The script cannot prove that ORB-30R is the best-performing ORB. The repository still lacks an accepted long-window independent ES/MES dataset.
 - The optional trailing stop is a separate experiment, not part of the frozen baseline. Leave it off for baseline tests.
 - Use standard candles, not Heikin Ashi, Renko, Range, Kagi or other synthetic chart types.

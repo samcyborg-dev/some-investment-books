@@ -19,7 +19,9 @@ strategy(
      calc_on_order_fills = true,
      calc_on_every_tick = false,
      max_bars_back = 5000,
-     use_bar_magnifier = true
+     // Bar Magnifier requires a paid TradingView plan. Keep this false so the
+     // strategy runs on the free plan; use a standard 5-minute chart instead.
+     use_bar_magnifier = false
  )
 
 // ─────────────────────────────────────────────────────────────────────────────

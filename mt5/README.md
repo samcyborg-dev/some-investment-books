@@ -2,6 +2,18 @@
 
 `RangeLab_HistoryExporter.mq5` is an **export-only MT5 script**. It reads the selected broker symbol's locally available history and writes bar values to CSV. It contains no `CTrade`, `OrderSend`, position-management or live-trading code.
 
+## Chromebook / WebTerminal limitation
+
+A Chromebook browser running **MT5 WebTerminal cannot install or execute `.mq5` files**. WebTerminal does not provide MetaEditor, the MQL5 `Scripts` folder or a general local-file API for custom scripts. The exporter must run in desktop MT5 with MetaEditor, normally on Windows.
+
+From a Chromebook, the practical options are:
+
+1. Use a Windows cloud desktop or VPS, connect to it through Chrome, install desktop MT5, compile this script in MetaEditor, run it, and download the CSV back to the Chromebook.
+2. Use a broker portal's own historical-data export if it provides one, then normalize the CSV before importing it into Range Lab.
+3. Use a Linux container/Wine installation only if you are comfortable with an unsupported MT5 desktop setup; this is broker- and Chromebook-architecture-dependent.
+
+Do not paste the `.mq5` source into WebTerminal; it will not run there. If your broker offers a separate web export/API, its exact symbol and timestamp convention must be recorded before using the data.
+
 ## What it exports
 
 Each row contains:

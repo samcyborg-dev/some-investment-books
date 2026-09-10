@@ -414,3 +414,12 @@
   padding-top: 12px;
   padding-bottom: 12px;
 }
+.market-test-metrics .metric-help {
+  display: inline-flex;
+  margin-left: 3px;
+  vertical-align: middle;
+}
+.market-test-metrics .metric-help .icon {
+  width: 11px;
+  height: 11px;
+}

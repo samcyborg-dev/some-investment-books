@@ -42,6 +42,8 @@ const state = {
   timer: null,
 };
 const tag = (s, kind = "") => `<span class="tag ${kind}">${s}</span>`;
+const metricHelp = (id) =>
+  `<button class="metric-help" data-action="metric" data-id="${id}" aria-label="Explain ${id}">${icon("info")}</button>`;
 const btn = (label, action, style = "", ico = "", extra = "") =>
   `<button type="button" class="button ${style}" data-market-action="${action}" ${extra}>${ico ? icon(ico) : ""}${label}</button>`;
 
@@ -108,8 +110,8 @@ function defaults(p) {
     max_units: a.max_units,
   };
 }
-function stat(label, value, note, tone = "") {
-  return `<article class="stat-card"><div class="stat-heading">${label}</div><div class="stat-value ${tone}">${value}</div><div class="stat-foot">${note}</div></article>`;
+function stat(label, value, note, tone = "", metric = "") {
+  return `<article class="stat-card"><div class="stat-heading"><span>${label}</span>${metric ? metricHelp(metric) : ""}</div><div class="stat-value ${tone}">${value}</div><div class="stat-foot">${note}</div></article>`;
 }
 function inputs() {
   const p = state.params;
@@ -193,7 +195,7 @@ function paint() {
  ${githubResultCard()}
  ${
    d
-     ? `<div class="stat-grid">${stat("Accepted RTH price bars", num(q.accepted_price_bars, 0), q.complete_sessions + " complete cash sessions")}${stat("Missing RTH bars", num(q.missing_rth_bars, 0), q.invalid_prices + " invalid OHLC · " + q.invalid_tick + " off-tick", q.missing_rth_bars ? "negative" : "")}${stat("Modeled fills", num(m.trades, 0), m.eligible_sessions + " sessions reached the warm-up gate")}${stat("Backtested net P&L", cash(m.net_pnl), m.trades ? "Assumed fills, fees and capital" : "No fills—not evidence of an edge", m.net_pnl > 0 ? "positive" : m.net_pnl < 0 ? "negative" : "")}</div>
+     ? `<div class="stat-grid">${stat("Accepted RTH price bars", num(q.accepted_price_bars, 0), q.complete_sessions + " complete cash sessions")}${stat("Missing RTH bars", num(q.missing_rth_bars, 0), q.invalid_prices + " invalid OHLC · " + q.invalid_tick + " off-tick", q.missing_rth_bars ? "negative" : "")}${stat("Modeled fills", num(m.trades, 0), m.eligible_sessions + " sessions reached the warm-up gate")}${stat("Backtested net P&L", cash(m.net_pnl), m.trades ? "Assumed fills, fees and capital" : "No fills—not evidence of an edge", m.net_pnl > 0 ? "positive" : m.net_pnl < 0 ? "negative" : "", "pnl")}</div>
  <div class="analysis-grid market-analysis"><section class="card"><div class="card-head"><div><h2>${state.asset} · observed five-minute candles</h2><p class="card-subtitle">${esc(d.provenance.short_name || p.assets[state.asset].name)} · New York cash session</p></div><select class="small-select" id="market-day" aria-label="Choose stored session">${d.days
    .filter((day) => day.observed_bars)
    .map(
@@ -214,16 +216,16 @@ function paint() {
          .join("")}</div>`
      : ""
  }<div class="market-test-metrics">${[
-   ["Trade win rate", m.trades ? num(m.win_rate) + "%" : "—"],
-   ["Net expectancy", m.trades ? num(m.expectancy_r) + "R" : "—"],
-   ["Profit factor", num(m.profit_factor)],
-   ["Closing-trade DD", m.trades ? num(m.max_closing_dd_pct) + "%" : "—"],
-   ["Ambiguous fills", num(m.ambiguous_trades, 0)],
-   ["Diagnostic Sharpe", num(m.sharpe_diagnostic)],
+   ["Trade win rate", m.trades ? num(m.win_rate) + "%" : "—", "winrate"],
+   ["Net expectancy", m.trades ? num(m.expectancy_r) + "R" : "—", "expectancy"],
+   ["Profit factor", num(m.profit_factor), "pf"],
+   ["Closing-trade DD", m.trades ? num(m.max_closing_dd_pct) + "%" : "—", "drawdown"],
+   ["Ambiguous fills", num(m.ambiguous_trades, 0), ""],
+   ["Diagnostic Sharpe", num(m.sharpe_diagnostic), "sharpe"],
  ]
    .map(
-     ([label, value]) =>
-       `<div><span>${label}</span><strong>${value}</strong></div>`,
+     ([label, value, metric]) =>
+       `<div><span>${label}${metric ? metricHelp(metric) : ""}</span><strong>${value}</strong></div>`,
    )
    .join(
      "",

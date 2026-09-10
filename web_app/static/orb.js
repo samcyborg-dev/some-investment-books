@@ -524,7 +524,7 @@ function openDialog(content, reader = false) {
 function dialogHead(title, sub = "") {
   return `<div class="dialog-head"><div><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ""}</div><button class="icon-button" data-action="close-dialog" aria-label="Close dialog">${icon("close")}</button></div>`;
 }
-function glossaryItems(query = "") {
+function glossaryItems(query = "", activeId = "") {
   const list = state.data.glossary.filter((m) =>
     [m.name, m.group, m.description, m.id]
       .join(" ")
@@ -535,22 +535,54 @@ function glossaryItems(query = "") {
     list
       .map(
         (m) =>
-          `<article class="glossary-item">${tag(m.group)}<h3>${m.name}</h3><code>${m.formula}</code><p>${m.description}</p></article>`,
+          `<article class="glossary-item ${m.id === activeId ? "glossary-item-active" : ""}" id="glossary-term-${esc(m.id)}" data-glossary-term="${esc(m.id)}">${tag(m.group)}<h3>${esc(m.name)}</h3><code>${esc(m.formula)}</code><p>${esc(m.description)}</p></article>`,
       )
       .join("") ||
     '<p class="muted">No metric matches. Try “drawdown”, “Sharpe” or “expectancy”.</p>'
   );
 }
-function openGlossary(query = "") {
+function glossaryQuickStart() {
+  return `<div class="glossary-quick-start"><strong>How to read this dashboard</strong><p>Start with the evidence label before interpreting a number. A model result is an assumption-based scenario, not a historical backtest.</p><div class="glossary-evidence-key"><span><b class="glossary-key-dot model"></b><strong>Illustrative</strong><small>assumed paths</small></span><span><b class="glossary-key-dot reported"></b><strong>Reported</strong><small>copied from a study</small></span><span><b class="glossary-key-dot user"></b><strong>User-supplied</strong><small>your records</small></span></div><div class="glossary-primer"><div><b>R</b><span>one unit of initial risk; <strong>+2R</strong> means twice that risk</span></div><div><b>ATR</b><span>recent average movement, used to scale stops and targets</span></div><div><b>RTH</b><span>regular cash-session hours; this research view uses 09:30–16:00 ET</span></div><div><b>EMA</b><span>a moving average used as a past-data trend filter</span></div></div><p class="glossary-reading-note"><b>—</b> means the available data does not support that metric. It is not zero.</p></div>`;
+}
+function renderGlossarySidebar(query = "", activeId = "") {
+  const aside = $("#glossary-sidebar");
+  const content = $("#glossary-sidebar-content");
+  if (!aside || !content) return;
+  content.innerHTML = `<div class="glossary-sidebar-head"><div><div class="eyebrow">REFERENCE · PLAIN ENGLISH</div><h2>Metric glossary</h2><p>What each number means, how it is calculated, and what it cannot prove.</p></div><button class="icon-button" data-action="close-glossary" aria-label="Close metric glossary">${icon("close")}</button></div><div class="glossary-sidebar-body">${glossaryQuickStart()}<div class="search-input-wrap glossary-search">${icon("search")}<input class="input" id="glossary-search" aria-label="Find a metric" placeholder="Search metrics, formulas or concepts" value="${esc(query)}"></div><div id="glossary-items">${glossaryItems(query, activeId)}</div></div>`;
+}
+function closeGlossary() {
+  const aside = $("#glossary-sidebar");
+  const shade = $("#glossary-shade");
+  if (!aside || aside.hidden) return;
+  aside.classList.remove("open");
+  aside.setAttribute("aria-hidden", "true");
+  if (shade) shade.hidden = true;
+  document.body.classList.remove("glossary-open");
+  window.setTimeout(() => {
+    if (!aside.classList.contains("open")) aside.hidden = true;
+  }, 180);
+}
+function openGlossary(query = "", activeId = "") {
   if (!state.data) return;
-  openDialog(
-    dialogHead(
-      "The metric glossary",
-      "Definitions, denominators and the limits of interpretation.",
-    ) +
-      `<div class="dialog-body"><div class="search-input-wrap glossary-search">${icon("search")}<input class="input" id="glossary-search" aria-label="Find a metric" placeholder="Search metrics, formulas or concepts" value="${esc(query)}"></div><div id="glossary-items">${glossaryItems(query)}</div></div>`,
-  );
-  $("#glossary-search").focus();
+  const aside = $("#glossary-sidebar");
+  const shade = $("#glossary-shade");
+  if (!aside) return;
+  if ($("#detail-dialog")?.open) $("#detail-dialog").close();
+  aside.hidden = false;
+  if (shade) shade.hidden = false;
+  renderGlossarySidebar(query, activeId);
+  document.body.classList.add("glossary-open");
+  aside.setAttribute("aria-hidden", "false");
+  requestAnimationFrame(() => aside.classList.add("open"));
+  requestAnimationFrame(() => {
+    const search = $("#glossary-search");
+    if (search) {
+      search.focus();
+      if (query) search.setSelectionRange(search.value.length, search.value.length);
+    }
+    const item = activeId ? document.getElementById("glossary-term-" + activeId) : null;
+    if (item) item.scrollIntoView({ block: "nearest" });
+  });
 }
 function openSource(id) {
   const s = state.data.registry.sources.find((s) => s.id === Number(id));
@@ -794,6 +826,10 @@ document.addEventListener("click", async (e) => {
     $("#detail-dialog").close();
     return;
   }
+  if (a === "close-glossary") {
+    closeGlossary();
+    return;
+  }
   if (a === "report") {
     openReport();
     return;
@@ -805,11 +841,10 @@ document.addEventListener("click", async (e) => {
   if (!state.data) return;
   const actions = {
     glossary: () => openGlossary(),
-    metric: () =>
-      openGlossary(
-        state.data.glossary.find((m) => m.id === target.dataset.id)?.name ||
-          target.dataset.id,
-      ),
+    metric: () => {
+      const metric = state.data.glossary.find((m) => m.id === target.dataset.id);
+      openGlossary(metric?.name || target.dataset.id, target.dataset.id);
+    },
     "go-lab": () => navigate("lab"),
     "go-research": () => navigate("research"),
     audit: () => {
@@ -1115,6 +1150,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeMenu();
     closeExport();
+    closeGlossary();
   }
 });
 $("#detail-dialog").addEventListener("click", (e) => {

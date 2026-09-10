@@ -24,6 +24,23 @@
   <body>
     <a class="skip-link" href="#main">Skip to dashboard</a>
     <div class="sidebar-shade" data-action="close-menu" hidden></div>
+    <div
+      class="glossary-shade"
+      id="glossary-shade"
+      data-action="close-glossary"
+      hidden
+    ></div>
+    <aside
+      class="glossary-sidebar"
+      id="glossary-sidebar"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Metric glossary"
+      aria-hidden="true"
+      hidden
+    >
+      <div id="glossary-sidebar-content"></div>
+    </aside>
     <aside class="sidebar" id="sidebar" aria-label="Main navigation">
       <a href="#overview" class="brand"
         ><img src="/static/orb-mark.svg" width="36" height="36" alt="" /><span

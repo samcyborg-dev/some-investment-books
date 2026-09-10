@@ -21,7 +21,7 @@ Open the port 8000 preview. The app accepts the preview host and permits iframe 
 - **Trade analytics:** CSV import, integer/tick/fee/timestamp validation, net P&L, win rate, profit factor, R expectancy, closing-trade equity and right-censored drawdown episodes. Includes an explicitly fictional sample, filtering and CSV export.
 - **Rulebook:** frozen ORB-30R proposal, New York/Nairobi date-aware session conversion and integer ES/MES position-sizing calculator.
 - **Journal:** saved research notes, search, delete and JSON export. Checklist preferences are stored in the browser. Notes are not verified broker records.
-- **Resources:** searchable metric glossary and complete 49-section in-app dossier reader. PDF, manuscript, source registry and research CSV downloads are same-origin. Result summaries also support copying if downloads are unavailable in a client.
+- **Resources:** a right-hand searchable metric glossary drawer (also opened by the metric info buttons or `⌘ K`) and a complete 49-section in-app dossier reader. The glossary explains formulas, plain-English terms such as R/ATR/RTH/EMA, evidence labels and why a value may be undefined. PDF, manuscript, source registry and research CSV downloads are same-origin. Result summaries also support copying if downloads are unavailable in a client.
 
 ## Evidence boundaries
 

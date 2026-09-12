@@ -1,5 +1,13 @@
 [
   {
+    "id": "fff9d0651f1f4fc0a7f88318798b5d41",
+    "title": "Strategy 2 preflight started",
+    "body": "Started the next recommended strategy: Prop Firm Statistical Z-Score Mean Reversion. This is a preflight only, not a performance run. The existing Python module is not accepted for project-owned results because it uses backward-filled indicators, whole-frame rather than RTH-only state, ambiguous same-bar target-first execution, fractional ES/MES quantities, an ADX default of 28 rather than the candidate 25, and incomplete causal EOD/risk handling. Candidate rules and data gates are documented in research/strategy_2/README.md. Next work is independent ES/MES five-minute provenance and quality intake, followed by a causal kernel and tests. Existing synthetic/unaudited Strategy 2 HTML metrics must not be published as evidence.",
+    "category": "Research",
+    "session_date": "2026-09-12",
+    "created_at": "2026-09-12T09:24:16.537781+00:00"
+  },
+  {
     "id": "0ac7ce2ad8094559ba8df5c66d1a7d84",
     "title": "Next strategy handoff - Strategy 2 data gate",
     "body": "Next recommended research track is Strategy 2: statistical Z-score mean reversion with an ADX regime filter. Do not run or publish performance results yet. First acquire an authorized, independent ES and MES five-minute dataset, create provenance and quality receipts, validate timestamps, sessions, duplicates, OHLC/tick integrity, volume warnings, and roll/adjustment treatment, then review the strategy's causal entry, exit, fee, integer-sizing, and risk-surveillance rules. No synthetic, vendor-variant, or live result is project-owned evidence until those gates pass.",

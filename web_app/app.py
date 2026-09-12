@@ -29,6 +29,7 @@ from web_app.market_api import market_router
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 RESEARCH = ROOT/'research'/'strategy_1'
+RESEARCH_2 = ROOT/'research'/'strategy_2'
 LIMITER = BoundedSemaphore(2)
 
 
@@ -161,7 +162,13 @@ def create_app(journal_path=None,market_path=None):
                     glossary=METRICS,audit=AUDIT,rules=RULES,validation=VALIDATION,
                     actual_performance={'win_rate':None,'expectancy_r':None,'sharpe':None,'max_drawdown':None,'pass_probability':None},
                     provenance={'model':'Uncalibrated educational model','source':'research/strategy_1/illustrative_results.json','seed':20260908,
-                                'historical_backtest':'Not validated','broker':'Not connected','pine':'Not implemented'})
+                                'historical_backtest':'Not validated','broker':'Not connected','pine':'Not implemented'},
+                    strategy2=read_json(RESEARCH_2/'strategy2_content.json'))
+
+    @app.get('/api/orb/strategy2')
+    def strategy2():
+        """Read-only, evidence-labeled Strategy 2 research content."""
+        return read_json(RESEARCH_2/'strategy2_content.json')
 
     @app.post('/api/orb/simulate')
     def run(params:SimulationInput):
@@ -221,13 +228,14 @@ def create_app(journal_path=None,market_path=None):
         return FileResponse(RESEARCH/'figures'/name,media_type='image/png')
 
     @app.get('/api/orb/download/{name}')
-    def download(name:Literal['dossier.pdf','grid.csv','stress.csv','sources.json','manuscript.md']):
+    def download(name:Literal['dossier.pdf','grid.csv','stress.csv','sources.json','manuscript.md','strategy2-content.json']):
         files={
             'dossier.pdf':(ROOT/'STRATEGY_1_ORB_FORENSIC_RESEARCH.pdf','application/pdf'),
             'grid.csv':(RESEARCH/'illustrative_pass_grid.csv','text/csv'),
             'stress.csv':(RESEARCH/'illustrative_stress.csv','text/csv'),
             'sources.json':(RESEARCH/'sources.json','application/json'),
             'manuscript.md':(RESEARCH/'report.md','text/markdown'),
+            'strategy2-content.json':(RESEARCH_2/'strategy2_content.json','application/json'),
         }
         path,mime=files[name]
         if not path.is_file():

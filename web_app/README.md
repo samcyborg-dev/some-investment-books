@@ -15,6 +15,7 @@ Open the port 8000 preview. The app accepts the preview host and permits iframe 
 
 ## Workspace
 
+- **Strategy 2 · Stat MR:** a read-only research segment for the statistical Z-score mean-reversion candidate. It includes the manual, frozen candidate rules, full metric registry, academic findings and transfer limits, a dated trader/public-script scan, style comparison, funded-account-versus-private-equity/private-capital recommendation, and validation gates. It intentionally shows no Strategy 2 performance values: `/api/orb/strategy2` and the downloadable `strategy2-content.json` are evidence-labeled content only.
 - **Overview:** model expectancy, target/breach/unresolved counts, percentile equity and drawdown bands, assumptions, validation status and selected published results.
 - **Scenario lab:** actual seeded recalculation of 20,000 hypothetical accounts; editable assumed win probability, risk, costs, activity, stop/target geometry, horizon and floor. Saved 12-cell sensitivity grid and seven stress presets reproduce the dossier. Edited inputs are explicitly marked until applied; old results are not silently relabeled.
 - **Research & evidence:** seven reported implementations, correct author return labels, timeframe comparisons, all 15 sources with access scope/limitations, and the unresolved local execution audit.
@@ -62,7 +63,7 @@ python3 web_app/tests/browser_smoke.py
 
 `ORB_BASE_URL` overrides the smoke-test URL; `ORB_BROWSER_PATH` selects an already-installed Chromium. The test covers all routes, real control recalculation, drafts versus completed results, downloads, source/metric dialogs, report images, ledger validation, sizing, DST, journal persistence/escaped user text, and mobile overflow. Scratch screenshots and downloaded test exports live in `.cache/orb-dashboard/` and are ignored.
 
-Automated axe WCAG 2 A/AA and 2.1 AA checks were run on the six default routes. These are automated checks, not a complete accessibility certification.
+Automated axe WCAG 2 A/AA and 2.1 AA checks were run on the seven default routes, including the Strategy 2 segment. These are automated checks, not a complete accessibility certification.
 
 To rebuild the dossier and its original figures, use the existing `research/strategy_1/requirements.txt`, `calculate_examples.py` and `build_pdf.py`. The original 18 research checks are separate from dashboard tests. Archive the code-audit hashes before rebuilding against a changed trading engine.
 

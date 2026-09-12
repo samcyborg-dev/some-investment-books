@@ -87,6 +87,12 @@ Keep the frozen candidate as a benchmark. Do not optimize it using the current O
 - Combine only sealed OOS trades for the walk-forward record.
 - Report ES and MES separately, with undefined metrics left undefined when the sample cannot support them.
 
+## Dashboard research registry
+
+`strategy2_content.json` is the source registry for the dashboard’s Strategy 2 segment. It contains the manual, candidate rules, formulas and interpretations for the full 81-metric registry, academic findings with transfer limits, eight public trader/script scan records, style comparison, account recommendations, and validation gates. Its evidence boundary is intentional: no Strategy 2 performance output is populated.
+
+The read-only dashboard API is `/api/orb/strategy2`; the same content is included in `/api/orb/bootstrap` and is downloadable from `/api/orb/download/strategy2-content.json`.
+
 ## Immediate next work
 
 1. Review and approve the candidate timing and target-priority choices above.

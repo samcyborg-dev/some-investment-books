@@ -1,0 +1,994 @@
+{
+  "as_of": "2026-09-12",
+  "title": "Strategy 2 - Statistical Z-Score Mean Reversion",
+  "short_title": "Statistical mean reversion",
+  "evidence_status": {
+    "overall": "PREFLIGHT ONLY",
+    "performance": "NOT RUN",
+    "data": "NO ACCEPTED ES/MES DATASET",
+    "code": "CANDIDATE PINE CREATED; TRADINGVIEW COMPILATION PENDING",
+    "internet": "ANECDOTAL CLAIMS ONLY"
+  },
+  "manual": {
+    "what_is_it": "Mean reversion is a conditional hypothesis: after an unusual move away from a defined reference value, price may move back toward that reference. A Z-score expresses the distance in standard-deviation units. The signal is not a prediction that price must return; the trade is valid only while the data support the regime, the execution cost is affordable, and risk is bounded.",
+    "what_it_is_not": "It is not a guarantee, a magic overbought/oversold indicator, a martingale, or permission to average down. A high win rate can coexist with rare large losses. A strategy that works in a balanced market can fail when a new trend, macro announcement, gap, or liquidity shock moves the mean itself.",
+    "why_this_candidate": "The candidate combines a transparent single-instrument Z-score with RSI exhaustion, a low-ADX regime gate, a fixed ATR protection, integer ES/MES sizing, an end-of-day flat rule, and explicit research costs. It is simple enough to audit and strict enough to test without inventing fills.",
+    "workflow": [
+      "Define the reference mean and the observation window before looking at the test result.",
+      "Calculate indicators causally from completed RTH observations; do not backward-fill the warm-up.",
+      "Require the low-trend regime and the exhaustion confirmation before sending an order.",
+      "Use a next-bar order model, one position at a time, and integer ES/MES quantities.",
+      "Freeze the ATR and target/stop policy at the signal; record the actual modeled fill and all costs.",
+      "Close before the session ends and stop new entries when the daily or total risk guard is reached.",
+      "Evaluate only sealed out-of-sample blocks. Keep anecdotal trader feedback separate from performance evidence."
+    ],
+    "failure_modes": [
+      "Trend continuation: an extreme reading can become the beginning of a much larger move.",
+      "Mean migration: the old EMA or VWAP is no longer the market's current reference value.",
+      "News and gaps: scheduled or surprise information can overwhelm statistical distance.",
+      "Costs and latency: a small expected reversion can disappear through spread, slippage, and delayed fills.",
+      "Selection and look-ahead: backfilled indicators or a tuned threshold can make a false edge.",
+      "Contract and session errors: continuous futures rolls, overnight bars, holidays, and early closes can change the signal."
+    ],
+    "mathematics": [
+      "Reference mean: μ_t = EMA20(C_t), calculated on completed RTH closes only. This is a moving conditional reference, not a fundamental fair value.",
+      "Rolling dispersion: σ_t = sqrt(Σ(C_i - μ_t)^2 / (n - 1)) over the declared 20-bar RTH window. Keep σ undefined when the warm-up or variance is invalid.",
+      "Standardized distance: Z_t = (C_t - μ_t) / σ_t. Negative Z means price is below the mean; positive Z means it is above. A Z-score is a scale normalization, not a probability of reversal.",
+      "Long setup: Z_t ≤ -1.8, RSI14_t < 32, and ADX14_t < 25 during the allowed signal window. Short setup is the sign-reversed rule: Z_t ≥ +1.8, RSI14_t > 68, and ADX14_t < 25.",
+      "Protection and objective: at signal, freeze ATR state and calculate a 1.5 ATR protective stop plus the declared adverse-Z rule. Compare a mean-touch target with a 1.8 ATR target in a predeclared test; never choose after seeing OOS results.",
+      "Costs and units: convert points to dollars using the contract point value, round to the 0.25-point tick, and subtract commissions, spread, and slippage once. ES and MES use separate point values and integer quantities."
+    ],
+    "interpretation": [
+      "Z = 0 means the close is at the current EMA reference. Z = -1.8 means the close is 1.8 rolling standard deviations below it, conditional on a lookback that may itself be changing.",
+      "Do not say “a two-standard-deviation event reverts 95% of the time.” That statement relies on a stable normal distribution and does not describe the conditional path, trend state, or trading costs.",
+      "RSI is an exhaustion/context filter, not proof that price has turned. ADX is a trend-strength gate, not a guarantee that the day is range-bound. ATR is a volatility scale, not a stop-quality certificate.",
+      "A mean can move toward price instead of price moving toward the mean. Record whether the target was reached by price, by mean migration, or not reached at all."
+    ],
+    "execution": [
+      "Evaluate only completed bars and submit after the signal bar under the chosen next-bar model. Record the reference price, requested order type, fill time, fill price, quantity, and rejection/partial status.",
+      "If target and stop are both inside one five-minute bar and no lower-timeframe sequence exists, apply the frozen conservative ambiguity rule or mark the trade unresolved. Never let code choose the favorable order automatically.",
+      "At the daily fill cap or soft halt, cancel new entries and continue to manage any existing position under the declared protection. The chart rule is not a guaranteed broker-side kill switch.",
+      "Generate the EOD close during the 15:45 ET bar for the intended 15:50 ET exit, handle early-close calendars separately, and report any missed or late flat action."
+    ],
+    "checklist": [
+      "Before signal: accepted data, RTH session, complete indicator warm-up, no scheduled/news block, and enough account headroom for one integer contract.",
+      "At signal: record Z, EMA, standard deviation, RSI, ADX, ATR, session time, direction, target policy, stop price, and expected costs.",
+      "After fill: record actual fill and latency, MAE/MFE, target/stop collision, exit reason, net P&L, net R, and whether the execution matched the model.",
+      "After session: reconcile fills and fees, stop if a risk guard triggered, preserve the immutable trade record, and do not retune parameters from one day."
+    ]
+  },
+  "candidate_rules": [
+    [
+      "Instrument",
+      "ES and MES independently",
+      "Never relabel ES as MES; keep contract month or continuous-series identity."
+    ],
+    [
+      "Chart",
+      "5-minute standard candles",
+      "No Heikin Ashi, Renko, Range, or other synthetic bars."
+    ],
+    [
+      "Session",
+      "09:30-16:00 America/New_York",
+      "Indicators update only on RTH bars."
+    ],
+    [
+      "Mean",
+      "Causal RTH EMA20",
+      "Reference value is formed from past and current completed RTH closes."
+    ],
+    [
+      "Dispersion",
+      "Causal RTH 20-bar standard deviation",
+      "Z-score is undefined until the lookback is populated."
+    ],
+    [
+      "Z-score",
+      "(close - EMA20) / StdDev20",
+      "Long extreme <= -1.8; short extreme >= +1.8."
+    ],
+    [
+      "Confirmation",
+      "Wilder RSI14",
+      "Long RSI < 32; short RSI > 68."
+    ],
+    [
+      "Regime",
+      "Wilder ADX14 < 25",
+      "The existing Python default of 28 is treated as a different variant."
+    ],
+    [
+      "Signal timing",
+      "10:15-15:05 ET completed bars",
+      "Order is submitted after the signal bar and intended for the next bar open."
+    ],
+    [
+      "Target",
+      "Frozen conditional mean or 1.8 ATR cap",
+      "Use the nearer valid target; priority must remain fixed during a fold."
+    ],
+    [
+      "Protection",
+      "1.5 ATR stop plus structural Z stop at |Z| >= 3.2",
+      "Ordinary five-minute OHLC cannot resolve both barriers if touched in one bar."
+    ],
+    [
+      "Position limit",
+      "One open position; maximum four fills per session",
+      "No averaging down or pyramiding."
+    ],
+    [
+      "Flat rule",
+      "Submit at 15:45 ET for intended 15:50 ET open",
+      "Shortened sessions need a separate calendar rule."
+    ],
+    [
+      "Sizing",
+      "Integer ES/MES contracts",
+      "Use tick rounding, fee reserve, slippage reserve, and skip unaffordable one-contract trades."
+    ],
+    [
+      "Risk guards",
+      "2.5% daily soft halt; 8% initial-capital circuit breaker",
+      "Chart-bar checks are not guaranteed broker or funded-account protection."
+    ]
+  ],
+  "recommended_use": [
+    {
+      "account": "Funded evaluation / prop-style account",
+      "recommendation": "Use this transparent, RTH-only, regime-gated single-instrument candidate as the first research and paper-testing design. Start with MES if the allowed risk budget cannot safely support one ES contract. Keep one position, no averaging down, flat before the daily cutoff, and honor the firm's actual rules separately.",
+      "why": "The design limits simultaneous exposure, makes entry and exit timing auditable, and can be observed on a five-minute chart. This is suitability for controlled testing, not a promise of a pass.",
+      "not_yet": "Do not use for a funded account until accepted data, paper execution, cost reconciliation, and multiple out-of-sample folds pass the project gates."
+    },
+    {
+      "account": "Private capital / private-equity portfolio",
+      "recommendation": "Do not simply scale the funded single-ES signal. Use it as a benchmark, then investigate a diversified, market-neutral spread or residual mean-reversion portfolio with conservative leverage and independent capacity checks.",
+      "why": "Private capital or a literal private-equity portfolio can tolerate a different holding period and diversification objective, but spread construction adds estimation, correlation, borrow/financing, roll, and model-risk problems. This intraday single-instrument candidate is a benchmark, not a complete PE investment thesis; a separate research branch is safer than mixing account objectives.",
+      "not_yet": "No private-capital allocation is recommended until long-window net results, drawdown, correlation, liquidity, and robustness are independently validated."
+    }
+  ],
+  "styles": [
+    {
+      "name": "Single-instrument Z-score / oscillator",
+      "mechanism": "Fade a standardized deviation from a rolling mean on one liquid instrument.",
+      "data": "One price series plus volume if used; five-minute RTH data for this project.",
+      "strength": "Transparent, low implementation complexity, easy to audit.",
+      "risk": "Catches a continuation when the mean migrates; sensitive to regime filters and costs.",
+      "funded": "Preferred first candidate",
+      "private": "Benchmark only until diversified"
+    },
+    {
+      "name": "VWAP or standard-deviation bands",
+      "mechanism": "Use a session-anchored volume-weighted mean and deviation bands.",
+      "data": "Reliable intraday volume and session definition are essential.",
+      "strength": "Natural intraday reference and widely used by discretionary traders.",
+      "risk": "VWAP touch is not a reversal; trend days and volume/venue differences can break it.",
+      "funded": "Possible later variant",
+      "private": "Useful component, not standalone allocation"
+    },
+    {
+      "name": "Bollinger / moving-average bands",
+      "mechanism": "Trade a price excursion beyond a moving-average plus/minus standard-deviation band.",
+      "data": "Single price series; easy to implement across markets.",
+      "strength": "Simple visual baseline and useful for sensitivity testing.",
+      "risk": "Band touch can be a breakout; thresholds are highly searched and easy to overfit.",
+      "funded": "Control variant only",
+      "private": "Component of a broader model"
+    },
+    {
+      "name": "Pairs / cointegration / spread stat arb",
+      "mechanism": "Trade a stationary relative-value spread between related instruments.",
+      "data": "Synchronized multi-leg prices, hedge ratio, roll, costs, and execution for both legs.",
+      "strength": "Removes some outright market direction and has a clearer relative-value thesis.",
+      "risk": "Cointegration can break; leg slippage, financing, borrow, and basis risk matter.",
+      "funded": "Operationally complex; not first design",
+      "private": "Longer-term candidate after single-series benchmark"
+    },
+    {
+      "name": "Cross-sectional residual reversal",
+      "mechanism": "Buy relatively weak residuals and sell relatively strong residuals after factor neutralization.",
+      "data": "Broad survivorship-free universe, factor data, shorting, borrow, and portfolio execution.",
+      "strength": "Closer to the academic statistical-arbitrage literature.",
+      "risk": "Many legs, capacity, crowding, and transaction-cost exposure; not a one-chart system.",
+      "funded": "Not suitable for this first prop workflow",
+      "private": "Possible institutional research track"
+    },
+    {
+      "name": "Overnight-gap reversal",
+      "mechanism": "Trade the intraday response after a statistically large overnight gap.",
+      "data": "Accurate session boundaries, gap definitions, event windows, and high-frequency data.",
+      "strength": "Has a specific market-closure hypothesis and a measurable event window.",
+      "risk": "Open volatility, news, spreads, and execution costs can erase the effect.",
+      "funded": "Separate event-study variant",
+      "private": "Potential diversified event sleeve"
+    },
+    {
+      "name": "Order-flow / auction-market reversion",
+      "mechanism": "Fade an imbalance near value areas, VWAP, profile levels, or liquidity zones after confirmation.",
+      "data": "Trade-level/order-flow, volume profile, and a precise execution record.",
+      "strength": "Can distinguish a failed move from a mere statistical extreme.",
+      "risk": "Hard to reproduce from ordinary OHLCV; discretionary claims are difficult to audit.",
+      "funded": "Manual confirmation only, not baseline",
+      "private": "Research only until data is available"
+    },
+    {
+      "name": "Regime-gated hybrid",
+      "mechanism": "Use mean reversion only in balanced/low-trend states and switch off or hand off to trend logic otherwise.",
+      "data": "Price, volatility, session, and a pre-declared regime classifier.",
+      "strength": "Addresses the main failure mode without pretending one signal works everywhere.",
+      "risk": "The gate can become an overfit switch; it must be validated out of sample.",
+      "funded": "Preferred extension after baseline",
+      "private": "Potential portfolio-level framework"
+    }
+  ],
+  "academic_research": [
+    {
+      "title": "Statistical arbitrage in the US equities market",
+      "authors": "Marco Avellaneda and Jeong-Hyun Lee (2010)",
+      "type": "Peer-reviewed Quantitative Finance article; working-paper version also available",
+      "url": "https://doi.org/10.1080/14697680903124632",
+      "ssrn": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1153505",
+      "finding": "Models idiosyncratic equity residuals using PCA or sector ETF factors and generates contrarian signals from mean-reverting residuals.",
+      "lesson": "Mean reversion is more naturally defined on a relative/residual series than on an unqualified outright price. Their equity universe, factor model, data, and execution are not the ES1! five-minute candidate.",
+      "limitation": "Does not validate our Z-score, RSI, ADX, ATR, ES/MES, or funded-account rules. Reported historical results are not transferable without replication."
+    },
+    {
+      "title": "Pairs Trading: Performance of a Relative-Value Arbitrage Rule",
+      "authors": "Evan Gatev, William Goetzmann, and K. Geert Rouwenhorst (1999 working paper; 2006 journal version)",
+      "type": "NBER Working Paper 7032 and Review of Financial Studies version",
+      "url": "https://www.nber.org/papers/w7032",
+      "ssrn": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=141615",
+      "finding": "A daily pairs-trading rule on historical US equities reported excess returns in its sample and examined transaction costs and bootstrap comparisons.",
+      "lesson": "Relative-value mean reversion has a distinct research design and is not the same as fading an ES price excursion.",
+      "limitation": "Daily equities, historical sample, pair selection, and execution differ from intraday ES/MES. The result is context, not evidence for this project."
+    },
+    {
+      "title": "Intraday Price Reversals in the US Stock Index Futures Market: A 15-Year Study",
+      "authors": "James L. Grant, Avner Wolf, and Susana Yu (2005)",
+      "type": "Peer-reviewed Journal of Banking and Finance article; SSRN abstract",
+      "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=689282",
+      "doi": "https://doi.org/10.1016/j.jbankfin.2004.04.006",
+      "finding": "Reports intraday reversals after large opening moves across a long historical US index-futures sample, while noting that bid-ask cost adjustments sharply reduce the practical significance.",
+      "lesson": "The relevant hypothesis has a futures precedent, but gross reversal patterns are not the same as net tradable expectancy.",
+      "limitation": "1987-2002 sample, a different rule, and a cost proxy. It does not validate current ES1!, our filters, or current fills."
+    },
+    {
+      "title": "Statistical Arbitrage with Mean-Reverting Overnight Price Gaps on High-Frequency Data of the S&P 500",
+      "authors": "Johannes Stuebinger and Lucas Schneider (2019)",
+      "type": "Peer-reviewed Journal of Risk and Financial Management article",
+      "url": "https://www.mdpi.com/1911-8074/12/2/51",
+      "finding": "Builds a jump-detection and mean-reverting strategy on high-frequency S&P 500 constituent data and reports results after transaction costs for its own design.",
+      "lesson": "Event definition, target time, costs, and sub-period checks matter; a mean-reversion label does not identify one universal strategy.",
+      "limitation": "Constituent stocks and overnight gaps, not a single ES/MES five-minute RTH rule. Published returns cannot be imported as our evidence."
+    },
+    {
+      "title": "Liquidity and Autocorrelations in Individual Stock Returns",
+      "authors": "Doron Avramov, Tarun Chordia, and Amit Goyal (2006)",
+      "type": "Peer-reviewed Journal of Finance article",
+      "url": "https://onlinelibrary.wiley.com/doi/10.1111/j.1540-6261.2006.01060.x",
+      "finding": "Finds short-run reversals related to illiquidity and reports that potential contrarian profits are smaller than likely transaction costs in its setting.",
+      "lesson": "Liquidity and implementation cost can be the economic mechanism and the reason a gross effect is not a net edge.",
+      "limitation": "Individual equities and short-run return data; it is not a direct test of ES futures."
+    },
+    {
+      "title": "What Happened to the Quants in August 2007?",
+      "authors": "Amir E. Khandani and Andrew W. Lo (2008 working paper; 2011 journal version)",
+      "type": "NBER Working Paper 14465 / Journal of Financial Markets",
+      "url": "https://www.nber.org/papers/w14465",
+      "ssrn": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1288988",
+      "finding": "Analyzes a severe unwind in quantitative long/short and market-making portfolios during August 2007.",
+      "lesson": "Crowding, correlated positions, deleveraging, and liquidity withdrawal can overwhelm a historically stable mean-reversion process.",
+      "limitation": "A systemic-equity episode, not evidence that our candidate will fail or succeed. It supports explicit tail and correlation stress tests."
+    },
+    {
+      "title": "A Regime-Conditioned Statistical Mean Reversion Framework for Intraday FX Markets",
+      "authors": "Amaanullah Bhatti (2026 working paper)",
+      "type": "SSRN working paper; methodological proposal, not accepted evidence",
+      "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6087107",
+      "finding": "Proposes volatility-normalized deviations, higher-timeframe regime conditioning, and risk normalization for intraday FX.",
+      "lesson": "Regime conditioning is a reasonable hypothesis to test rather than assuming mean reversion is unconditional.",
+      "limitation": "FX framework and recent working paper; it does not validate ES/MES or our thresholds."
+    },
+    {
+      "title": "Mean Reversion in Stock Prices",
+      "authors": "James M. Poterba and Lawrence H. Summers (1988)",
+      "type": "NBER Working Paper 2343 / Journal of Financial Economics article",
+      "url": "https://www.nber.org/papers/w2343",
+      "finding": "Studies long-horizon negative autocorrelation in stock prices and discusses mean reversion relative to random-walk and present-value explanations.",
+      "lesson": "Mean reversion is horizon-dependent. Evidence over years cannot be treated as evidence that a five-minute ES price will revert before a stop, cost, or session close.",
+      "limitation": "Long-horizon stock-price evidence and a different economic question; it does not validate intraday futures signals, filters, or execution."
+    }
+  ],
+  "practitioner_scan": [
+    {
+      "source": "r/FuturesTrading - The VWAP mean reversion is my new jam",
+      "date": "2025-12-13",
+      "url": "https://www.reddit.com/r/FuturesTrading/comments/1pladiq/the_vwap_mean_reversion_is_my_new_jam/",
+      "claim": "The poster reports that mean-reversion setups felt more consistent than ORB for them, waits until after 10:30 ET, uses VWAP deviation bands, and exits toward VWAP or structure.",
+      "feedback": "Replies repeatedly qualify the claim: it works better in balanced conditions, news and trend days can be dangerous, and context/market structure matters.",
+      "evidence_grade": "Anecdote; no independently auditable statement"
+    },
+    {
+      "source": "r/FuturesTrading - Any successful mean-reversion traders here?",
+      "date": "2023-01-17",
+      "url": "https://www.reddit.com/r/FuturesTrading/comments/10ek1rq/any_successful_meanreversion_traders_here/",
+      "claim": "Commenters describe order-flow, volume-profile, and confirmation-based reversion trading in ES; some report personal success.",
+      "feedback": "Other commenters warn against averaging in, note that extremes do not make reversal imminent, and say context plus confirmation is more important than a band touch.",
+      "evidence_grade": "Anecdote and disagreement; no verified track record"
+    },
+    {
+      "source": "r/FuturesTrading - My VWAP mean reversion stopped working",
+      "date": "2026-02-04",
+      "url": "https://www.reddit.com/r/FuturesTrading/comments/1qvbwcv/my_strategy_vwap_mean_reversion_stopped_working/",
+      "claim": "The discussion describes a VWAP reversion approach losing when volatility and market structure changed.",
+      "feedback": "Several replies attribute the failure to a regime shift and warn that wider bands do not fix a market that is accepting prices away from the old mean.",
+      "evidence_grade": "Anecdotal failure report; useful failure hypothesis, not a measured study"
+    },
+    {
+      "source": "r/algotrading - Backtests lie. Live trading doesn't",
+      "date": "2026-03-04",
+      "url": "https://www.reddit.com/r/algotrading/comments/1rkghne/backtests_lie_live_trading_doesnt/",
+      "claim": "A commenter reports an SPY mean-reversion backtest with a high win rate that performed badly live because entries used wide-open spreads and mid-price assumptions.",
+      "feedback": "The thread emphasizes data, symbol maintenance, slippage, and the difference between modeled and live execution.",
+      "evidence_grade": "Anecdotal execution warning; no source account verification"
+    },
+    {
+      "source": "r/algotrading - Best mean reversion metric to base on?",
+      "date": "2026-04-19",
+      "url": "https://www.reddit.com/r/algotrading/comments/1spr49z/best_mean_reversion_metric_to_base_on/",
+      "claim": "Participants discuss ATR, VWAP, RSI, standard-deviation bands, and five-minute entries; several say a stretch is not itself a reversal.",
+      "feedback": "The recurring practical suggestion is to identify low-momentum/balanced regimes and wait for evidence that price has stopped continuing, rather than catching the first extreme.",
+      "evidence_grade": "Anecdotal discussion; no controlled comparison"
+    },
+    {
+      "source": "TradingView open-source Z-Score Mean Reversion Model",
+      "date": "2026-04-28",
+      "url": "https://www.tradingview.com/script/xEZgA7VY-Z-Score-Mean-Reversion-Model/",
+      "claim": "The author presents Z-score zones, a signal-line reversal confirmation, and mean price as a target across assets and timeframes.",
+      "feedback": "The page is an indicator description, not a broker-verified performance record. Its example is a crypto perpetual contract, not ES/MES.",
+      "evidence_grade": "Public script description; not independent validation"
+    },
+    {
+      "source": "TradingView invite-only Spread Mean Reversion Strategy [SciQua]",
+      "date": "2025-08-12",
+      "url": "https://www.tradingview.com/script/tLrPE6nd-Spread-Mean-Reversion-Strategy-SciQua/",
+      "claim": "The page describes limit-only Z-score trading for futures spreads, persistence filters, cooldowns, roll blocking, and flattening rules.",
+      "feedback": "TradingView identifies it as invite-only and warns users to understand the author and script before paying. It is designed for spreads/synthetic instruments rather than our outright ES rule.",
+      "evidence_grade": "Vendor/author description; access restricted and performance not independently verified"
+    },
+    {
+      "source": "r/algotrading - A Mean Reversion Strategy with 2.11 Sharpe",
+      "date": "2024-05-20",
+      "url": "https://www.reddit.com/r/algotrading/comments/1cwsco8/a_mean_reversion_strategy_with_211_sharpe/",
+      "claim": "The author claims a SPY mean-reversion backtest produced 2.11 Sharpe, 13.0% annualized return, and 20.3% maximum drawdown over roughly 25 years.",
+      "feedback": "Replies identify a large parameter-search space, different data vendors, leverage and interest assumptions, and sensitivity to 1 bp versus 5 bp slippage. The claim is not an ES/MES result and has no independent audit here.",
+      "evidence_grade": "Public performance claim; credibility limits and no project replication"
+    }
+  ],
+  "metrics": [
+    [
+      "Signal quality",
+      "Eligible RTH sessions",
+      "COUNT(session_id WHERE accepted bars == expected bars AND warm-up is complete).",
+      "Denominator for session-level rates; a missing or incomplete session must not silently count as a tradable day.",
+      "Required before rates"
+    ],
+    [
+      "Signal quality",
+      "Signal count",
+      "COUNT(t WHERE Z_t <= -1.8 or Z_t >= +1.8 AND RSI/ADX/session/risk gates pass).",
+      "Shows how often the frozen hypothesis actually asks to trade; low counts widen uncertainty and high counts increase cost sensitivity.",
+      "Required"
+    ],
+    [
+      "Signal quality",
+      "Fill rate",
+      "filled_signals / signal_count; report canceled, rejected, and expired orders separately.",
+      "A large gap between signals and fills is an execution result, not a reason to assume the intended fill occurred.",
+      "Required"
+    ],
+    [
+      "Signal quality",
+      "Long/short balance",
+      "COUNT(side) and SUM(net_P&L | side) for LONG and SHORT independently.",
+      "Asymmetry may reveal a directional or session bias; report both sides even when one side is profitable.",
+      "Required"
+    ],
+    [
+      "Signal quality",
+      "Z at entry",
+      "Z_t = (Close_t - EMA20_t) / StdDev20_t; record both signal-bar and fill-bar values.",
+      "Compare signal versus fill Z; deterioration toward zero can mean the implementation is entering late.",
+      "Required"
+    ],
+    [
+      "Signal quality",
+      "RSI and ADX at entry",
+      "RSI14_t and ADX14_t computed only from information available at the completed signal bar.",
+      "Confirms the filters were evaluated with information available at the decision time.",
+      "Required"
+    ],
+    [
+      "Signal quality",
+      "Time to reversion",
+      "(exit_timestamp - entry_timestamp) in bars/minutes, classified by mean touch, target, stop, and time exit.",
+      "A short median can hide a long right tail; use it to set timeout and capital-usage expectations.",
+      "Required"
+    ],
+    [
+      "Signal quality",
+      "MAE / MFE",
+      "For direction-adjusted return r_t, MAE = min(r_t) and MFE = max(r_t) between fill and exit; scale by points and R.",
+      "MAE supports stop design; MFE shows whether exits leave the expected reversion on the table.",
+      "Requires path data"
+    ],
+    [
+      "Signal quality",
+      "Target/stop collision",
+      "COUNT(bar WHERE high >= upper_barrier AND low <= lower_barrier) under the position direction; disclose the tie rule.",
+      "A large or unresolved count means ordinary five-minute OHLC cannot establish the trade outcome without a declared conservative rule.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Gross P&L",
+      "(ExitPrice - EntryPrice) × PointValue × Quantity × Direction.",
+      "Pre-cost return is useful for diagnosing the signal but is not a tradable result.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Net P&L",
+      "Gross P&L - commission - spread cost - slippage - other documented costs.",
+      "Primary account result after all declared costs; reconcile it to the trade ledger.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Net expectancy",
+      "MEAN(Net P&L per closed trade); also report MEAN(Net R).",
+      "Positive mean net result is necessary but can be statistically weak or dominated by tails.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Win rate",
+      "COUNT(Net P&L > 0) / COUNT(all closed trades); scratches remain in the denominator.",
+      "Do not use alone; mean reversion can win often and lose a large amount on continuation.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Average win / loss",
+      "MEAN(Net P&L | Net P&L > 0) and MEAN(Net P&L | Net P&L < 0).",
+      "Together with frequency, these determine expectancy and expose asymmetric tail dependence.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Payoff ratio",
+      "MEAN(Net win) / ABS(MEAN(Net loss)); undefined if either side is absent.",
+      "A low ratio demands a high win rate and leaves little room for costs or regime drift.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Profit factor",
+      "SUM(Net P&L > 0) / ABS(SUM(Net P&L < 0)); undefined if there are no losses.",
+      "Above one is not enough; require adequate sample, OOS stability, and a credible cost model.",
+      "Requires both sides"
+    ],
+    [
+      "Return",
+      "Expectancy R",
+      "SUM(Net R) / N, where R = Net P&L / fixed initial-risk dollars.",
+      "Normalizes trades to initial risk so ES and MES can be compared without pretending risk is identical.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Turnover and exposure",
+      "SUM(abs(entry_qty) + abs(exit_qty)); exposure = time in position / available session time.",
+      "Higher turnover and time-in-market generally increase costs, operational burden, and capacity pressure.",
+      "Required"
+    ],
+    [
+      "Risk",
+      "Maximum drawdown",
+      "MAX_t(peak_equity_t - equity_t) / peak_equity_t; compute close-to-close and intraday marks.",
+      "Sizing and account suitability depend on the definition; report close-to-close and intraday/open-equity versions.",
+      "Required"
+    ],
+    [
+      "Risk",
+      "Daily drawdown",
+      "MAX_day(start_or_peak_day_equity - lowest_realized_plus_open_equity_mark) using the declared reset.",
+      "Compare with the firm or account rule using the same reset and floating-P&L convention; it is not a broker guarantee.",
+      "Required"
+    ],
+    [
+      "Risk",
+      "Worst day/week/month",
+      "MIN(period_net_P&L) across complete and incomplete calendar periods, labeled separately.",
+      "Concentration can make an apparently acceptable total return unusable under daily loss limits.",
+      "Required"
+    ],
+    [
+      "Risk",
+      "Loss streak",
+      "MAX consecutive count where Net P&L <= 0, calculated for trades and for sessions.",
+      "Use both trade and session streaks to test psychological and funded-account tolerance.",
+      "Required"
+    ],
+    [
+      "Risk",
+      "Recovery time",
+      "First timestamp/trade count after a drawdown trough where equity >= prior peak; NULL if unrecovered.",
+      "A long recovery ties up capital and can breach a trailing floor before the strategy recovers.",
+      "Required"
+    ],
+    [
+      "Risk",
+      "Tail loss / CVaR",
+      "VaR_alpha = quantile(losses, alpha); CVaR_alpha = MEAN(loss | loss <= VaR_alpha), with alpha declared.",
+      "Captures continuation and gap risk that average loss and standard deviation can understate.",
+      "Needs sufficient sample"
+    ],
+    [
+      "Risk",
+      "Gap and stop slippage",
+      "Realized exit loss - modeled stop loss, split by gap, latency, partial fill, and other cause.",
+      "If this is unknown, a fixed stop result is optimistic exactly where the strategy is most vulnerable.",
+      "Needs path/execution data"
+    ],
+    [
+      "Risk",
+      "Margin and capital usage",
+      "MAX(initial_margin + risk_reserve + cost_reserve) and its ratio to available equity/cushion.",
+      "A one-contract trade can still be unaffordable after margin, loss cushion, fees, and gap reserve.",
+      "Account-specific"
+    ],
+    [
+      "Statistical",
+      "Sample size and intervals",
+      "N trades and N independent sessions; interval = declared bootstrap/HAC confidence interval around the estimate.",
+      "Wide intervals or few independent sessions mean the result is exploratory regardless of headline metrics.",
+      "Required"
+    ],
+    [
+      "Statistical",
+      "Stationarity / half-life",
+      "Fit Δx_t = a + b x_(t-1) + ε_t; half-life = -ln(2) / ln(1+b) when the estimate is valid.",
+      "A stationary spread or residual can support a reversion hypothesis; a raw price need not be stationary.",
+      "Candidate research"
+    ],
+    [
+      "Statistical",
+      "Autocorrelation / variance ratio",
+      "rho(k) = Corr(r_t, r_(t-k)); VR(q) = Var(sum_q returns) / (q × Var(return)).",
+      "Evidence of negative serial dependence must persist at the intended horizon and after costs.",
+      "Candidate research"
+    ],
+    [
+      "Statistical",
+      "Parameter sensitivity",
+      "For a predeclared neighborhood, report metric range, rank stability, and sign consistency—not only the best point.",
+      "A broad plateau is more credible than a single sharp optimum; include costs and nearby values.",
+      "Required for robustness"
+    ],
+    [
+      "Statistical",
+      "Walk-forward fold stability",
+      "OOS_passed_folds / tested_folds plus fold-level net expectancy, drawdown, and trade count.",
+      "Promotion requires repeated sealed OOS behavior, not an aggregate that hides failed folds.",
+      "Required"
+    ],
+    [
+      "Statistical",
+      "Deflated Sharpe / PBO",
+      "Deflated Sharpe adjusts observed Sharpe for trials/non-normality; PBO = fraction of combinatorial splits selecting an IS winner that fails OOS.",
+      "These adjust inference for selection and multiple testing; they are meaningless before the search history is recorded.",
+      "Blocked until data"
+    ],
+    [
+      "Execution/data",
+      "Coverage and completeness",
+      "Expected bars - observed valid bars per session, plus missing-session and early-close flags.",
+      "Bad or incomplete sessions bias signals, trade counts, and risk; retain a machine-readable receipt.",
+      "Required"
+    ],
+    [
+      "Execution/data",
+      "Timestamp and duplicate audit",
+      "COUNT(non-monotonic, duplicate, conflicting duplicate, misaligned, or timezone-ambiguous records).",
+      "Timezone and duplicate errors can create look-ahead, double-counting, or session-boundary artifacts.",
+      "Required"
+    ],
+    [
+      "Execution/data",
+      "Tick and OHLC validity",
+      "COUNT(price % 0.25 != 0, nonfinite values, high < max(open,close), low > min(open,close), or negative volume).",
+      "Invalid prices can create impossible fills; reject or quarantine them rather than repairing silently.",
+      "Required"
+    ],
+    [
+      "Execution/data",
+      "Roll/adjustment treatment",
+      "Results by dated contract and continuous-series construction; record roll date, multiplier, and adjustment formula.",
+      "Results can change materially across continuous-series construction and contract rolls; document the choice.",
+      "Required"
+    ],
+    [
+      "Execution/data",
+      "Fill latency and slippage",
+      "fill_timestamp - signal_timestamp; slippage_ticks = (actual - reference) / 0.25, direction-adjusted, plus dollars.",
+      "Execution drift is a strategy input for a short-horizon trade, not an after-the-fact cosmetic adjustment.",
+      "Requires actual records"
+    ],
+    [
+      "Funded",
+      "Rule-limit headroom",
+      "MIN(limit - realized_plus_open_loss) over each day/trailing period; report breaches and near-breaches.",
+      "A positive backtest can still fail a funded rule if one loss or streak uses too much daily/trailing cushion.",
+      "Firm-specific"
+    ],
+    [
+      "Private capital",
+      "Correlation and capacity",
+      "Corr(strategy_returns, other_sleeves), marginal portfolio risk, and size at which spread/impact exceeds the edge.",
+      "Private capital needs incremental portfolio value after impact, financing, and correlation—not standalone return alone.",
+      "Portfolio-specific"
+    ],
+    [
+      "Regime",
+      "Performance by ADX bucket",
+      "For each declared ADX bucket b: COUNT(trades_b), SUM(net_P&L_b), MEAN(net_R_b), drawdown_b.",
+      "Shows whether the ADX gate actually isolates a stable low-trend region; never select the best bucket after OOS.",
+      "Required"
+    ],
+    [
+      "Regime",
+      "Performance by realized-volatility bucket",
+      "For each realized-volatility bucket v: MEAN(net_R | v) and tail/drawdown statistics, with bucket cutoffs frozen.",
+      "A reversion edge can be cost-sensitive in quiet markets and continuation-prone in expansion; report both.",
+      "Required"
+    ],
+    [
+      "Regime",
+      "Trend/range classification",
+      "For each predeclared trend/range state s: COUNT(trades_s), expectancy_s, and loss-tail_s; classifier is defined before testing.",
+      "Tests the core conditional hypothesis and exposes a gate that merely relabels outcomes.",
+      "Required"
+    ],
+    [
+      "Regime",
+      "Performance by time of day",
+      "MEAN(net_R | signal_time bucket) and fill/slippage by 5-minute time bucket.",
+      "Reveals open/news/lunch/close effects and prevents a whole-session average from hiding a bad window.",
+      "Required"
+    ],
+    [
+      "Regime",
+      "Performance by weekday",
+      "MEAN(net_R | weekday) and trade/session counts, with holidays separated.",
+      "Weekday differences are descriptive until they persist across independent folds.",
+      "Required"
+    ],
+    [
+      "Regime",
+      "News versus no-news",
+      "MEAN(net_R | declared news window) and rule violations; news calendar version must be recorded.",
+      "A news block must be evaluated as a causal risk control, not added after seeing losses.",
+      "Requires event calendar"
+    ],
+    [
+      "Regime",
+      "ES versus MES split",
+      "All signal, fill, return, risk, and cost metrics grouped independently by instrument.",
+      "MES is not ES scaled down for evidence purposes; separate samples prevent pooling artifacts.",
+      "Required"
+    ],
+    [
+      "Regime",
+      "Session and calendar state",
+      "Metrics by ordinary RTH, early close, holiday-adjacent, roll, and incomplete-session flags.",
+      "Calendar handling can create or remove apparent signals; incomplete sessions should not be silently pooled.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Trade count",
+      "COUNT(all filled closed trades), with open, canceled, rejected, and unresolved records reported separately.",
+      "A small count limits the reliability of every other performance metric.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Average net trade",
+      "SUM(Net P&L) / N closed trades, including scratches in N.",
+      "The direct per-trade dollar contribution; do not confuse it with gross target size.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Median net trade",
+      "MEDIAN(Net P&L) and MEDIAN(Net R) across closed trades.",
+      "Comparison with the mean reveals whether a few tail trades drive the headline expectancy.",
+      "Required"
+    ],
+    [
+      "Return",
+      "R-multiple distribution",
+      "For each trade R_i = Net P&L_i / fixed initial risk_i; report quantiles, histogram, skew, and tail percentiles.",
+      "The distribution is more informative than win rate for asymmetric stop/target trades.",
+      "Required"
+    ],
+    [
+      "Return",
+      "Sharpe / Sortino",
+      "Sharpe = mean(period return) / stdev(period return); Sortino = mean(period return) / downside deviation, with period and annualization declared.",
+      "Only use after a sufficiently long, correctly timed equity series; serial dependence and search inflate it.",
+      "Needs equity series"
+    ],
+    [
+      "Return",
+      "Annualized return and volatility",
+      "CAGR = (ending_equity / starting_equity)^(1/years) - 1; annualized volatility uses the declared return sampling period.",
+      "Annualization is not meaningful for a short or censored sample and must not be used to dress up trade-level data.",
+      "Needs long history"
+    ],
+    [
+      "Risk",
+      "Drawdown duration",
+      "Calendar time and closed-trade/session count from a prior peak to recovery; NULL if unrecovered.",
+      "A shallow but long drawdown can be operationally worse than a short deep one.",
+      "Required"
+    ],
+    [
+      "Risk",
+      "Ulcer index",
+      "sqrt(MEAN(drawdown_pct_t^2)) over the declared equity-mark series.",
+      "Captures persistent drawdown discomfort; mark frequency and open P&L convention must be stated.",
+      "Needs equity marks"
+    ],
+    [
+      "Risk",
+      "Downside deviation",
+      "sqrt(MEAN(min(0, return_t - MAR)^2)) with a declared minimum acceptable return and period.",
+      "Focuses on harmful variation; it is undefined or unstable when the sample is too small.",
+      "Needs equity series"
+    ],
+    [
+      "Risk",
+      "VaR",
+      "VaR_alpha = quantile(losses, alpha) under an explicitly stated historical/bootstrap/model convention.",
+      "A percentile threshold is not a worst-case loss and can miss gaps and regime changes.",
+      "Needs sufficient sample"
+    ],
+    [
+      "Risk",
+      "CVaR / tail-loss frequency",
+      "CVaR_alpha = MEAN(loss | loss <= VaR_alpha); tail frequency = COUNT(loss <= VaR_alpha) / N.",
+      "Shows how often and how severely the continuation tail appears; declare alpha and sample power.",
+      "Needs sufficient sample"
+    ],
+    [
+      "Risk",
+      "Worst loss streak duration",
+      "MAX calendar/session duration of a consecutive net-loss run, in addition to trade count.",
+      "Maps the risk to a funded trailing floor and to a trader’s ability to continue following the rules.",
+      "Required"
+    ],
+    [
+      "Execution/data",
+      "Commission",
+      "SUM(all entry/exit commissions and exchange fees) by instrument and round trip.",
+      "Must reconcile exactly to the broker or research cost schedule; never hide it inside slippage.",
+      "Requires cost schedule"
+    ],
+    [
+      "Execution/data",
+      "Slippage in ticks and dollars",
+      "Ticks = direction_adjusted(actual_fill - reference_fill) / 0.25; dollars = ticks × tick_value × quantity.",
+      "A small edge is not credible if it survives only at the mid or assumes favorable fills.",
+      "Requires fills"
+    ],
+    [
+      "Execution/data",
+      "MAE and MFE separately",
+      "MAE = minimum direction-adjusted excursion; MFE = maximum direction-adjusted excursion, reported in points, ticks, dollars, and R.",
+      "Separate excursions support stop/target diagnosis and identify missed exits.",
+      "Requires path data"
+    ],
+    [
+      "Execution/data",
+      "Latency proxy",
+      "Signal-to-order and order-to-fill elapsed milliseconds/seconds, or bar-level proxy if clock precision is unavailable.",
+      "Latency is a documented limitation when only bars exist; do not call a bar proxy live latency.",
+      "Requires execution log"
+    ],
+    [
+      "Execution/data",
+      "Same-bar ambiguity count",
+      "COUNT(trades where both stop and target are touched in one bar without sequence evidence).",
+      "Ambiguity must be conservative or unresolved; favorable ordering is a hidden performance claim.",
+      "Required"
+    ],
+    [
+      "Execution/data",
+      "Time in trade",
+      "SUM(exit_timestamp - entry_timestamp) and distribution by exit reason, in bars and minutes.",
+      "Capital usage and exposure can be high even when the median trade is short.",
+      "Required"
+    ],
+    [
+      "Execution/data",
+      "Time to mean",
+      "Time from fill until Z crosses the declared mean/target, conditional on reaching it; censored observations remain visible.",
+      "A target that takes too long can fail the account or cost budget even if it eventually reverts.",
+      "Required"
+    ],
+    [
+      "Statistical",
+      "Newey-West / HAC statistic",
+      "HAC standard error uses a declared lag/window to account for autocorrelation and heteroskedasticity; report estimate, SE, and test statistic.",
+      "Use for dependent return series where appropriate; do not treat a p-value as proof of tradability.",
+      "Requires return series"
+    ],
+    [
+      "Statistical",
+      "Probability of backtest overfitting",
+      "PBO = fraction of combinatorial or CPCV splits where the selected in-sample winner underperforms its OOS median/benchmark.",
+      "Requires the full search space and split protocol; it cannot be invented from one baseline run.",
+      "Blocked until search log"
+    ],
+    [
+      "Statistical",
+      "Parameter stability",
+      "For each parameter, report sign/metric stability across neighboring values, folds, instruments, and cost cases.",
+      "Stable plateaus are preferred over a sharp optimum; instability is a promotion blocker.",
+      "Required for robustness"
+    ],
+    [
+      "Statistical",
+      "Walk-forward pass rate",
+      "COUNT(OOS folds meeting every predeclared criterion) / COUNT(tested OOS folds), with each fold visible.",
+      "The aggregate pass rate cannot hide a catastrophic failed fold.",
+      "Required"
+    ],
+    [
+      "Statistical",
+      "Out-of-sample / live drift",
+      "Drift = live_or_forward_metric - sealed_OOS_metric for returns, fills, slippage, latency, and regime mix.",
+      "A drift report diagnoses deployment mismatch; it is not evidence that the model should be retuned immediately.",
+      "Requires forward records"
+    ],
+    [
+      "Funding",
+      "Daily loss-limit utilization",
+      "MAX_day(realized_plus_open_loss) / firm_daily_loss_limit, with reset timezone and floating-loss convention.",
+      "Keep headroom; a simulated value cannot certify a firm rule without its exact contract and reset logic.",
+      "Firm-specific"
+    ],
+    [
+      "Funding",
+      "Probability of rule violation",
+      "COUNT(simulated paths breaching any declared daily/trailing/total rule) / COUNT(paths), using a declared path model.",
+      "Only meaningful after calibrated trade distributions and exact firm rules exist; no project value yet.",
+      "Blocked until data"
+    ],
+    [
+      "Funding",
+      "Consecutive-loss probability",
+      "Empirical or bootstrap probability of at least k losses before recovery, with dependence model stated.",
+      "Averages can look safe while a realistic cluster still violates a daily/trailing floor.",
+      "Needs sufficient sample"
+    ],
+    [
+      "Funding",
+      "Minimum viable contract size",
+      "MIN(integer quantity) satisfying risk, margin, fee, slippage, and floor-cushion constraints; report ES and MES separately.",
+      "If one contract is too large, skip the trade; fractional contracts are not a workaround.",
+      "Account-specific"
+    ],
+    [
+      "Private capital",
+      "Liquidity and capacity",
+      "Estimate size at which spread + market impact + queue/fill risk exceeds the declared edge, separately for ES/MES and variants.",
+      "A liquid instrument is not infinite-capacity; capacity must be a net, execution-aware result.",
+      "Requires depth/impact data"
+    ],
+    [
+      "Private capital",
+      "Diversification",
+      "Number of independent sleeves/instruments and concentration measures such as HHI or effective number of bets.",
+      "One correlated intraday signal is not diversified just because it trades two contract symbols.",
+      "Portfolio-specific"
+    ],
+    [
+      "Private capital",
+      "Correlation to ORB/trend sleeves",
+      "Corr(strategy returns, ORB returns), beta, and joint drawdown frequency on synchronized observations.",
+      "Private capital should be judged by incremental portfolio contribution, not standalone return.",
+      "Needs shared history"
+    ],
+    [
+      "Private capital",
+      "Portfolio contribution / marginal risk",
+      "Marginal contribution = portfolio risk(with sleeve) - portfolio risk(without sleeve), under the declared risk model.",
+      "A lower-return sleeve can be useful only if it improves portfolio risk/return after costs.",
+      "Portfolio-specific"
+    ],
+    [
+      "Private capital",
+      "Leverage and financing",
+      "Gross/net leverage, margin, financing/roll cost, and stress loss under the declared capital structure.",
+      "Futures leverage can amplify a stable-looking signal into a portfolio-level tail event.",
+      "Account-specific"
+    ],
+    [
+      "Private capital",
+      "Scalability and implementation cost",
+      "Net capacity-adjusted expectancy across size tiers, including execution, financing, data, and operational cost.",
+      "Scale only after the edge survives impact and the portfolio remains liquid under stress.",
+      "Requires depth/impact data"
+    ]
+  ],
+  "validation_gates": [
+    [
+      "1. Specification",
+      "Candidate values and timing written; unresolved choices labeled exploratory.",
+      "PASS - documented in research/strategy_2/README.md"
+    ],
+    [
+      "2. Source/code audit",
+      "No backward fill, no fractional ES/MES, explicit RTH, causal order timing, deterministic same-bar policy.",
+      "FAIL/PENDING - existing Python module has blockers; candidate Pine is preflight"
+    ],
+    [
+      "3. Data receipt",
+      "Independent ES and MES provenance, hashes, timestamp, session, OHLC, tick, duplicate, volume, and roll checks.",
+      "PENDING - no accepted dataset"
+    ],
+    [
+      "4. Kernel tests",
+      "Unit tests for indicators, session boundaries, warm-up, order timing, costs, sizing, risk, and barrier ambiguity.",
+      "PENDING"
+    ],
+    [
+      "5. Historical run",
+      "Only accepted data; report undefined metrics honestly and preserve raw inputs privately.",
+      "BLOCKED until Gate 3"
+    ],
+    [
+      "6. Walk-forward",
+      "12-week IS / 4-week OOS preferred; 8/2 only when history is limited; no leakage.",
+      "NOT RUN"
+    ],
+    [
+      "7. Paper execution",
+      "Compare modeled signals/fills with actual acknowledgments, prices, slippage, and missed orders.",
+      "NOT RUN"
+    ],
+    [
+      "8. Promotion",
+      "Separate funded/private decision after repeated OOS folds, costs, drawdown, and operational controls.",
+      "NOT ELIGIBLE"
+    ]
+  ],
+  "walk_forward": {
+    "current_position": "Strategy 2 has no performance sample. The current work is preflight, not a backtest.",
+    "preferred": "12 weeks in-sample -> 4 weeks out-of-sample, roll four weeks",
+    "limited_history": "8 weeks in-sample -> 2 weeks out-of-sample, explicitly low power",
+    "procedure": [
+      "Keep the candidate baseline as a permanent benchmark.",
+      "Use only the IS window to choose any permitted variant; prefer a parameter plateau.",
+      "Freeze code, inputs, symbol, session, costs, and data version before OOS.",
+      "Seal the OOS report and trades before any later decision.",
+      "Repeat by fold and combine only sealed OOS trades.",
+      "Review ES and MES independently; do not pool them to make a weak sample look larger."
+    ]
+  },
+  "scan_method": "Internet scan performed 12 September 2026 using public academic pages, SSRN/NBER/publisher pages, public Reddit search results, and public TradingView script pages. Reddit pages returned HTTP 403 to the page-fetcher, so those entries are search-result summaries and remain unverified anecdotes. No paid script was acquired, no credentials were used, and no trader claim is treated as project evidence."
+}

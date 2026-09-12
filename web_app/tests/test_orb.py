@@ -52,6 +52,32 @@ def test_bootstrap_separates_evidence(client):
     assert client.post('/api/backtest').status_code==410
 
 
+def test_strategy2_content_is_exposed_and_evidence_labeled(client):
+    page=client.get('/api/orb/strategy2')
+    boot=client.get('/api/orb/bootstrap')
+    assert page.status_code==200
+    content=page.json()
+    assert content==boot.json()['strategy2']
+    assert content['evidence_status']['performance']=='NOT RUN'
+    assert len(content['metrics'])==81
+    assert len(content['academic_research'])==8
+    assert len(content['practitioner_scan'])==8
+    assert content['recommended_use'][0]['account'].startswith('Funded')
+    assert content['recommended_use'][1]['account'].startswith('Private')
+    assert all(len(row)==5 and all(str(cell).strip() for cell in row) for row in content['metrics'])
+    assert {'Return','Risk','Execution/data','Regime','Statistical','Funding','Private capital'} <= {row[0] for row in content['metrics']}
+    assert all(item['url'].startswith('http') for item in content['academic_research'])
+    assert all(item['url'].startswith('http') for item in content['practitioner_scan'])
+    assert content['scan_method'].startswith('Internet scan performed')
+    download=client.get('/api/orb/download/strategy2-content.json')
+    assert download.status_code==200
+    assert download.headers['content-type'].startswith('application/json')
+    assert 'attachment' in download.headers['content-disposition']
+    assert download.json()==content
+    html=client.get('/').text
+    assert 'href="#strategy2"' in html and 'Strategy 2' in html
+
+
 @pytest.mark.parametrize('row',SAVED['grid'])
 def test_all_grid_cells_match_saved_research(row):
     r=simulate(SimulationInput(win_rate=row['win_probability']*100,risk_pct=row['risk_fraction']*100))

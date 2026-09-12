@@ -85,6 +85,15 @@ def main():
         expect(page.locator('.timeframe-row').nth(2)).to_contain_text('35.0%')
         page.screenshot(animations='disabled',path=str(ARTIFACTS/'research-desktop.png'),full_page=True)
 
+        page.locator('.nav-link[data-route=strategy2]').click()
+        expect(page.get_by_role('heading',name='Strategy 2 - Statistical Z-Score Mean Reversion',exact=True)).to_be_visible()
+        expect(page.locator('.strategy2-status-grid')).to_contain_text('NOT RUN')
+        expect(page.locator('.practitioner-table tbody tr')).to_have_count(8)
+        expect(page.locator('.metric-registry tbody tr')).to_have_count(81)
+        expect(page.locator('.strategy2-footer-note')).to_contain_text('Project-owned Strategy 2 results: none')
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        page.screenshot(animations='disabled',path=str(ARTIFACTS/'strategy2-desktop.png'),full_page=True)
+
         page.locator('.search-trigger').click()
         page.locator('#glossary-search').fill('Sharpe')
         expect(page.locator('#glossary-items')).to_contain_text('Sharpe ratio')
@@ -162,7 +171,7 @@ def main():
         expect(mobile.get_by_role('heading',name='Stress-test the possibilities')).to_be_visible()
         assert mobile.evaluate('document.documentElement.scrollWidth <= innerWidth')
         mobile.screenshot(animations='disabled',path=str(ARTIFACTS/'lab-mobile.png'),full_page=True)
-        for route in ['research','trades','rules','journal']:
+        for route in ['research','strategy2','trades','rules','journal']:
             mobile.goto(BASE+'/#'+route,wait_until='networkidle')
             mobile.wait_for_function('!document.querySelector(".loading-screen")')
             assert mobile.evaluate('document.documentElement.scrollWidth <= innerWidth'),route

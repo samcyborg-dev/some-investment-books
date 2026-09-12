@@ -93,10 +93,29 @@ Keep the frozen candidate as a benchmark. Do not optimize it using the current O
 
 The read-only dashboard API is `/api/orb/strategy2`; the same content is included in `/api/orb/bootstrap` and is downloadable from `/api/orb/download/strategy2-content.json`.
 
+## Research harness now available
+
+- `strategy2_engine.py` is the isolated causal kernel. It accepts private CSV or native Yahoo chart JSON, emits an input SHA-256/quality receipt, excludes incomplete sessions without filling bars, and models next-bar execution, tick rounding, costs, integer sizing, stop/target ambiguity, EOD flattening, and risk guards.
+- `run_strategy2.py receipt` validates an input without calculating trades. `run_strategy2.py backtest --research-only` is an explicit acknowledgement that any vendor/user-upload result is not project-owned evidence. The derived JSON contains no raw price rows.
+- `strategy2_validation.py` provides all-target comparison, an unranked parameter grid, and chronological frozen-configuration walk-forward folds. It never selects a target or parameter from an OOS result.
+- `test_strategy2_engine.py` and `test_strategy2_validation.py` are synthetic plumbing/invariant tests. They currently pass; synthetic results are not performance evidence.
+
+Example from a Chromebook/Browser-saved file:
+
+```bash
+python3 research/strategy_2/run_strategy2.py receipt \\
+  --asset ES --input data/market/es.csv --output results/es-receipt.json --pretty
+python3 research/strategy_2/run_strategy2.py backtest --research-only \\
+  --asset ES --input data/market/es.csv --target-mode nearer \\
+  --output results/es-strategy2-research.json --pretty
+```
+
+Keep the downloaded source and any sidecar metadata under the ignored `data/market/` directory. Do not commit raw vendor bars. A `PASS_FOR_KERNEL / NOT_PROJECT_OWNED` receipt is a structural pass only; it is not an approval of provenance, continuous-contract roll treatment, live execution, or trading performance.
+
 ## Immediate next work
 
-1. Review and approve the candidate timing and target-priority choices above.
-2. Build the data intake/quality receipt for independent ES and MES.
-3. Rewrite or isolate a causal execution kernel; do not call the existing synthetic engine a validated backtest.
-4. Add unit tests for warm-up, RTH boundaries, next-bar fills, integer sizing, same-bar stop/target ambiguity, EOD flatness, daily kill-switch behavior, and roll/session identity.
-5. Only after those gates pass, run the first chronological walk-forward fold.
+1. Obtain the longest valid free five-minute ES and MES history available through the browser/authorized export, independently and without relabelling either asset.
+2. Review each receipt for native symbol/contract identity, timezone, coverage, rolls, session calendar, missing bars, duplicates, off-tick values, and volume limitations.
+3. Run the causal kernel separately for ES and MES, then compare all predeclared target variants and cost/slippage assumptions without promoting a winner.
+4. Run the chronological OOS folds only where the available session count supports them; report undefined metrics honestly when it does not.
+5. Only after data, causal timing, execution, robustness, and OOS gates pass, revise the advanced Pine source. Pine compilation or a TradingView Strategy Tester report alone is not validation.

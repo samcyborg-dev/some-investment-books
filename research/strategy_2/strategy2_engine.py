@@ -863,8 +863,8 @@ def load_yahoo_json(path: str | Path, asset: Asset, source: str | None = None) -
             raise Strategy2DataError(f"Yahoo symbol {meta.get('symbol')!r} does not match selected {asset} ({expected_symbol}).")
         if meta.get("dataGranularity") != "5m":
             raise Strategy2DataError("Only native Yahoo five-minute bars are supported.")
-        if meta.get("instrumentType") not in (None, "FUTURE"):
-            raise Strategy2DataError("Yahoo input is not a futures instrument.")
+        if meta.get("instrumentType") != "FUTURE":
+            raise Strategy2DataError("Yahoo input is not explicitly identified as a futures instrument.")
         timestamps = result["timestamp"]
         quote = result["indicators"]["quote"][0]
         if not timestamps or any(len(quote[key]) != len(timestamps) for key in ("open", "high", "low", "close")):

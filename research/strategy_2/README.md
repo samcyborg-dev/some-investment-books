@@ -114,6 +114,8 @@ Keep the downloaded source and any sidecar metadata under the ignored `data/mark
 
 For a free public-runner smoke test, `scripts/github_strategy2_test.py` fetches ES=F and MES=F separately for the maximum 59-calendar-day Yahoo snapshot, keeps raw responses in temporary runner storage, and emits derived receipts, target variants, and frozen-config walk-forward summaries only. `.github/workflows/strategy2-market-test.yml` is prepared for manual dispatch; it requires GitHub Actions workflow-write permission to publish, and its output remains vendor-reported / NOT PROJECT-OWNED. The local/browser route is still preferred when GitHub connectivity is unavailable.
 
+On a Chromebook, run `python3 scripts/fetch_free_bars.py --asset ES --days 59` and the MES equivalent to print the exact native Yahoo URLs, open each URL in the browser, save the JSON response privately under `data/market/`, and run the `receipt` command above. If the WebTerminal cannot transfer a browser download into the workspace, use the dashboard's private Market data import or attach the two files; do not paste ES rows into an MES file. The 59-day snapshot is a free smoke-test window, not the long-window project-owned dataset required for a performance conclusion.
+
 ## Immediate next work
 
 1. Obtain the longest valid free five-minute ES and MES history available through the browser/authorized export, independently and without relabelling either asset.

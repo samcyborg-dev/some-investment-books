@@ -1,6 +1,10 @@
 # RangeLab ORB-30R Advanced Pine Script
 
-File: `pinescript/RangeLab_ORB30R_Advanced.pine`
+Files:
+
+- `pinescript/RangeLab_ORB30R_Advanced.pine` - strategy source.
+- `pinescript/RangeLab_ORB30R_Manual.pdf` - user, testing, and walk-forward manual.
+- `pinescript/RangeLab_ORB30R_Manual.md` - editable manual source.
 
 This is an advanced TradingView **strategy script for research, backtesting, paper testing and alerts**. It is not a broker EA and does not place live orders.
 

@@ -112,6 +112,8 @@ python3 research/strategy_2/run_strategy2.py backtest --research-only \\
 
 Keep the downloaded source and any sidecar metadata under the ignored `data/market/` directory. Do not commit raw vendor bars. A `PASS_FOR_KERNEL / NOT_PROJECT_OWNED` receipt is a structural pass only; it is not an approval of provenance, continuous-contract roll treatment, live execution, or trading performance.
 
+For a free public-runner smoke test, `scripts/github_strategy2_test.py` fetches ES=F and MES=F separately for the maximum 59-calendar-day Yahoo snapshot, keeps raw responses in temporary runner storage, and emits derived receipts, target variants, and frozen-config walk-forward summaries only. `.github/workflows/strategy2-market-test.yml` is prepared for manual dispatch; it requires GitHub Actions workflow-write permission to publish, and its output remains vendor-reported / NOT PROJECT-OWNED. The local/browser route is still preferred when GitHub connectivity is unavailable.
+
 ## Immediate next work
 
 1. Obtain the longest valid free five-minute ES and MES history available through the browser/authorized export, independently and without relabelling either asset.

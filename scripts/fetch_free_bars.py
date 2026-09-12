@@ -21,10 +21,14 @@ def main():
     parser.add_argument('--asset',choices=SYMBOLS,default='ES')
     parser.add_argument('--days',type=int,default=59,help='Recent calendar days, 5–59. Not unlimited history.')
     parser.add_argument('--output',type=Path,help='Private output JSON path. Default data/market/ASSET-yahoo-download.json')
+    parser.add_argument('--print-url',action='store_true',help='Print the native URL and exit without making a request.')
     args=parser.parse_args()
     if not 5<=args.days<=59:parser.error('--days must be 5–59')
     now=datetime.now(timezone.utc);symbol=SYMBOLS[args.asset]
     url=f'https://query1.finance.yahoo.com/v8/finance/chart/{quote(symbol,safe="")}?period1={int((now-timedelta(days=args.days)).timestamp())}&period2={int(now.timestamp())}&interval=5m&includePrePost=true'
+    if args.print_url:
+        print(url)
+        return
     output=args.output or Path('data/market')/(args.asset+'-yahoo-download.json')
     request=Request(url,headers={'User-Agent':'Mozilla/5.0 (RangeLab personal research)','Accept':'application/json'})
     try:

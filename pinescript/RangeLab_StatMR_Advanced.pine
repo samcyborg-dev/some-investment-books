@@ -1,0 +1,410 @@
+//@version=6
+// RangeLab Statistical Mean Reversion Advanced
+// Candidate implementation for Strategy 2 preflight and paper observation.
+// This is not a validated performance result or a broker execution system.
+strategy(
+     title = "RangeLab Statistical Mean Reversion | Research",
+     shorttitle = "RangeLab StatMR",
+     overlay = true,
+     initial_capital = 100000,
+     currency = currency.USD,
+     pyramiding = 0,
+     default_qty_type = strategy.fixed,
+     default_qty_value = 1,
+     commission_type = strategy.commission.cash_per_contract,
+     commission_value = 5.0,
+     slippage = 1,
+     process_orders_on_close = false,
+     calc_on_order_fills = true,
+     calc_on_every_tick = false,
+     max_bars_back = 5000,
+     use_bar_magnifier = false
+ )
+
+// Inputs
+string groupSession = "01 - Session and clock"
+string groupSignal  = "02 - Mean-reversion rules"
+string groupRisk    = "03 - Position and prop risk"
+string groupDisplay = "04 - Diagnostics"
+
+string sessionTimezone = input.string("America/New_York", "Session timezone", options = ["America/New_York", "Etc/UTC"], group = groupSession)
+string rthSession      = input.session("0930-1600:23456", "RTH session", group = groupSession)
+string signalSession   = input.session("1015-1510:23456", "Signal window", group = groupSession)
+string flatSignal      = input.session("1545-1550:23456", "Exit-order bar", group = groupSession)
+
+int zLength            = input.int(20, "EMA and standard-deviation length", minval = 2, group = groupSignal)
+float zEntryThreshold  = input.float(1.8, "Entry absolute Z-score", minval = 0.1, step = 0.1, group = groupSignal)
+float zStopThreshold   = input.float(3.2, "Structural stop absolute Z-score", minval = 0.1, step = 0.1, group = groupSignal)
+int rsiLength          = input.int(14, "Wilder RSI length", minval = 2, group = groupSignal)
+float rsiLongThreshold = input.float(32.0, "Long RSI below", minval = 1.0, maxval = 49.0, step = 0.5, group = groupSignal)
+float rsiShortThreshold = input.float(68.0, "Short RSI above", minval = 51.0, maxval = 99.0, step = 0.5, group = groupSignal)
+int adxLength          = input.int(14, "ADX DI length", minval = 2, group = groupSignal)
+int adxSmoothing       = input.int(14, "ADX smoothing", minval = 2, group = groupSignal)
+float adxThreshold     = input.float(25.0, "Ranging regime ADX below", minval = 1.0, step = 0.5, group = groupSignal)
+int warmupRthBars      = input.int(250, "Completed RTH warm-up bars", minval = 20, group = groupSignal)
+float atrStopMultiple  = input.float(1.5, "Protective stop x ATR", minval = 0.1, step = 0.1, group = groupSignal)
+float atrTargetMultiple = input.float(1.8, "ATR target cap x ATR", minval = 0.1, step = 0.1, group = groupSignal)
+int atrLength          = input.int(14, "Wilder ATR length", minval = 2, group = groupSignal)
+
+string instrument      = input.string("ES", "Sizing instrument", options = ["ES", "MES"], group = groupRisk)
+float pointValue       = instrument == "ES" ? 50.0 : 5.0
+float tickSize         = input.float(0.25, "Research tick size", minval = 0.00001, step = 0.25, group = groupRisk)
+float riskPct          = input.float(0.50, "Risk allowance per trade (%)", minval = 0.01, maxval = 10.0, step = 0.01, group = groupRisk)
+int maxContracts       = input.int(1, "Maximum integer contracts", minval = 1, maxval = 100, group = groupRisk)
+float feeReserve       = input.float(5.0, "Round-trip fee reserve / contract ($)", minval = 0.0, step = 0.01, group = groupRisk)
+float slippageReserve  = input.float(1.0, "Slippage reserve per side (ticks)", minval = 0.0, step = 0.25, group = groupRisk)
+bool rejectUnaffordable = input.bool(true, "Skip if one contract exceeds risk", group = groupRisk)
+int maxDailyTrades     = input.int(4, "Maximum fills per RTH session", minval = 1, maxval = 20, group = groupRisk)
+float dailyKillPct      = input.float(2.5, "Daily soft kill-switch (%)", minval = 0.1, maxval = 50.0, step = 0.1, group = groupRisk)
+float totalLossPct      = input.float(8.0, "Total loss circuit-breaker (%)", minval = 0.1, maxval = 90.0, step = 0.1, group = groupRisk)
+
+bool showMean          = input.bool(true, "Plot EMA20 mean and bands", group = groupDisplay)
+bool showIndicators    = input.bool(false, "Plot RSI/ADX values", group = groupDisplay)
+bool showStatusTable   = input.bool(true, "Show diagnostic table", group = groupDisplay)
+bool showSignals       = input.bool(true, "Show signal and fill markers", group = groupDisplay)
+
+// Helpers
+inSession(string session) =>
+    not na(time(timeframe.period, session, sessionTimezone))
+
+roundDown(float price) =>
+    math.floor(price / tickSize + 0.00000001) * tickSize
+
+roundUp(float price) =>
+    math.ceil(price / tickSize - 0.00000001) * tickSize
+
+calculateQuantity(float entryPrice, float frozenAtr, bool isLong) =>
+    float rawStop = isLong ? entryPrice - frozenAtr * atrStopMultiple : entryPrice + frozenAtr * atrStopMultiple
+    float roundedStop = isLong ? roundDown(rawStop) : roundUp(rawStop)
+    float priceRisk = math.abs(entryPrice - roundedStop)
+    float slippageDollars = 2.0 * slippageReserve * tickSize * pointValue
+    float riskPerContract = priceRisk * pointValue + feeReserve + slippageDollars
+    float riskBudget = strategy.equity * riskPct / 100.0
+    int affordable = riskPerContract > 0 ? int(math.floor(riskBudget / riskPerContract)) : 0
+    int sized = math.min(affordable, maxContracts)
+    rejectUnaffordable ? sized : math.max(sized, 1)
+
+// Chart and session guards
+bool isFiveMinute = timeframe.isminutes and timeframe.multiplier == 5
+bool inRth = inSession(rthSession)
+bool inSignalWindow = inSession(signalSession)
+bool isExitOrderBar = inSession(flatSignal)
+int currentSessionKey = year(time, sessionTimezone) * 10000 + month(time, sessionTimezone) * 100 + dayofmonth(time, sessionTimezone)
+
+// RTH-only causal indicator state. Overnight bars do not update any state.
+var int rthBars = 0
+var float priorRthCloseState = na
+var float priorRthHighState = na
+var float priorRthLowState = na
+var float emaState = na
+var float standardDeviationState = na
+var array<float> closeWindow = array.new_float(0)
+
+var int atrCount = 0
+var float atrTrueRangeSum = 0.0
+var float atrState = na
+
+var int rsiCount = 0
+var float rsiGainSum = 0.0
+var float rsiLossSum = 0.0
+var float rsiAvgGain = na
+var float rsiAvgLoss = na
+
+var int diCount = 0
+var float diTrueRangeSum = 0.0
+var float diPlusSum = 0.0
+var float diMinusSum = 0.0
+var float diTrueRange = na
+var float diPlusSmoothed = na
+var float diMinusSmoothed = na
+var int adxCount = 0
+var float adxDxSum = 0.0
+var float adxState = na
+
+float zScore = na
+float rsiValue = na
+float plusDI = na
+float minusDI = na
+float dxValue = na
+
+if inRth
+    float trueRange = na(priorRthCloseState) ? high - low : math.max(high - low, math.max(math.abs(high - priorRthCloseState), math.abs(low - priorRthCloseState)))
+    float delta = na(priorRthCloseState) ? 0.0 : close - priorRthCloseState
+    float gain = math.max(delta, 0.0)
+    float loss = math.max(-delta, 0.0)
+
+    float upMove = na(priorRthHighState) ? 0.0 : high - priorRthHighState
+    float downMove = na(priorRthLowState) ? 0.0 : priorRthLowState - low
+    float plusDM = upMove > downMove and upMove > 0.0 ? upMove : 0.0
+    float minusDM = downMove > upMove and downMove > 0.0 ? downMove : 0.0
+
+    rthBars += 1
+    emaState := na(emaState) ? close : emaState + (2.0 / (zLength + 1.0)) * (close - emaState)
+
+    array.push(closeWindow, close)
+    if array.size(closeWindow) > zLength
+        array.shift(closeWindow)
+
+    int windowSize = array.size(closeWindow)
+    if windowSize >= zLength
+        float sum = 0.0
+        float sumSquares = 0.0
+        for index = 0 to windowSize - 1
+            float value = array.get(closeWindow, index)
+            sum += value
+            sumSquares += value * value
+        float windowMean = sum / windowSize
+        float variance = math.max(sumSquares / windowSize - windowMean * windowMean, 0.0)
+        standardDeviationState := math.sqrt(variance)
+        zScore := standardDeviationState > 0.0 ? (close - emaState) / standardDeviationState : na
+
+    if atrCount < atrLength
+        atrCount += 1
+        atrTrueRangeSum += trueRange
+        if atrCount == atrLength
+            atrState := atrTrueRangeSum / atrLength
+    else
+        atrState := (atrState * (atrLength - 1.0) + trueRange) / atrLength
+
+    if rsiCount < rsiLength
+        rsiCount += 1
+        rsiGainSum += gain
+        rsiLossSum += loss
+        if rsiCount == rsiLength
+            rsiAvgGain := rsiGainSum / rsiLength
+            rsiAvgLoss := rsiLossSum / rsiLength
+    else
+        rsiAvgGain := (rsiAvgGain * (rsiLength - 1.0) + gain) / rsiLength
+        rsiAvgLoss := (rsiAvgLoss * (rsiLength - 1.0) + loss) / rsiLength
+
+    if not na(rsiAvgGain) and not na(rsiAvgLoss)
+        rsiValue := rsiAvgLoss == 0.0 ? 100.0 : 100.0 - 100.0 / (1.0 + rsiAvgGain / rsiAvgLoss)
+
+    if diCount < adxLength
+        diCount += 1
+        diTrueRangeSum += trueRange
+        diPlusSum += plusDM
+        diMinusSum += minusDM
+        if diCount == adxLength
+            diTrueRange := diTrueRangeSum / adxLength
+            diPlusSmoothed := diPlusSum / adxLength
+            diMinusSmoothed := diMinusSum / adxLength
+    else
+        diTrueRange := (diTrueRange * (adxLength - 1.0) + trueRange) / adxLength
+        diPlusSmoothed := (diPlusSmoothed * (adxLength - 1.0) + plusDM) / adxLength
+        diMinusSmoothed := (diMinusSmoothed * (adxLength - 1.0) + minusDM) / adxLength
+
+    if not na(diTrueRange) and diTrueRange > 0.0
+        plusDI := 100.0 * diPlusSmoothed / diTrueRange
+        minusDI := 100.0 * diMinusSmoothed / diTrueRange
+        float diSum = plusDI + minusDI
+        dxValue := diSum > 0.0 ? 100.0 * math.abs(plusDI - minusDI) / diSum : 0.0
+
+    if not na(dxValue)
+        if adxCount < adxSmoothing
+            adxCount += 1
+            adxDxSum += dxValue
+            if adxCount == adxSmoothing
+                adxState := adxDxSum / adxSmoothing
+        else
+            adxState := (adxState * (adxSmoothing - 1.0) + dxValue) / adxSmoothing
+
+    priorRthCloseState := close
+    priorRthHighState := high
+    priorRthLowState := low
+
+// Daily and total prop-style guards. These are modeled chart-bar checks, not
+// guaranteed intrabar broker or evaluation-account protection.
+var int sessionKey = na
+var float dayStartEquity = na
+var float peakEquity = na
+var bool dailyHalted = false
+var bool totalHalted = false
+var int fillsToday = 0
+
+if na(peakEquity)
+    peakEquity := strategy.equity
+else
+    peakEquity := math.max(peakEquity, strategy.equity)
+
+bool newSession = inRth and (na(sessionKey) or currentSessionKey != sessionKey)
+if newSession
+    sessionKey := currentSessionKey
+    dayStartEquity := strategy.equity
+    dailyHalted := false
+    fillsToday := 0
+
+float dailyDrawdownPct = na(dayStartEquity) or dayStartEquity <= 0.0 ? 0.0 : math.max(0.0, (dayStartEquity - strategy.equity) / dayStartEquity * 100.0)
+float totalDrawdownPct = na(peakEquity) or peakEquity <= 0.0 ? 0.0 : math.max(0.0, (peakEquity - strategy.equity) / peakEquity * 100.0)
+float totalLossFromInitialPct = strategy.equity < strategy.initial_capital ? (strategy.initial_capital - strategy.equity) / strategy.initial_capital * 100.0 : 0.0
+
+if dailyDrawdownPct >= dailyKillPct
+    dailyHalted := true
+
+if totalLossFromInitialPct >= totalLossPct
+    totalHalted := true
+
+// Position and pending-order state
+var int pendingSide = 0
+var int pendingQuantity = 0
+var float pendingAtr = na
+var float pendingMean = na
+var bool signalPlacedThisBar = false
+signalPlacedThisBar := false
+
+bool flat = strategy.position_size == 0
+bool noDailyLimit = fillsToday < maxDailyTrades
+bool gatesReady = rthBars >= warmupRthBars and not na(zScore) and not na(rsiValue) and not na(adxState) and not na(atrState)
+bool riskAllowsEntry = not dailyHalted and not totalHalted
+bool canSeekSignal = isFiveMinute and inSignalWindow and flat and pendingSide == 0 and noDailyLimit and riskAllowsEntry and gatesReady and adxState < adxThreshold
+bool longSignal = canSeekSignal and zScore <= -zEntryThreshold and rsiValue < rsiLongThreshold
+bool shortSignal = canSeekSignal and zScore >= zEntryThreshold and rsiValue > rsiShortThreshold
+
+// Market orders are submitted after a completed signal bar and normally fill
+// at the next bar's open because process_orders_on_close is false.
+if dailyHalted or totalHalted
+    strategy.cancel("MR-L")
+    strategy.cancel("MR-S")
+    pendingSide := 0
+    pendingQuantity := 0
+    pendingAtr := na
+    pendingMean := na
+
+if longSignal
+    int quantity = calculateQuantity(close, atrState, true)
+    if quantity > 0
+        pendingSide := 1
+        pendingQuantity := quantity
+        pendingAtr := atrState
+        pendingMean := emaState
+        strategy.entry("MR-L", strategy.long, qty = quantity, comment = "StatMR long next-open")
+        signalPlacedThisBar := true
+
+if shortSignal
+    int quantity = calculateQuantity(close, atrState, false)
+    if quantity > 0
+        pendingSide := -1
+        pendingQuantity := quantity
+        pendingAtr := atrState
+        pendingMean := emaState
+        strategy.entry("MR-S", strategy.short, qty = quantity, comment = "StatMR short next-open")
+        signalPlacedThisBar := true
+
+// Bracket state is created from the actual modeled fill and the frozen signal ATR.
+var float entryPrice = na
+var float frozenAtr = na
+var float frozenMean = na
+var float initialStop = na
+var float targetPrice = na
+var float activeStop = na
+
+bool justEntered = strategy.position_size != 0 and strategy.position_size[1] == 0
+bool justExited = strategy.position_size == 0 and strategy.position_size[1] != 0
+
+if justEntered
+    fillsToday += 1
+    entryPrice := strategy.position_avg_price
+    frozenAtr := na(pendingAtr) ? atrState : pendingAtr
+    frozenMean := na(pendingMean) ? emaState : pendingMean
+
+    if strategy.position_size > 0
+        initialStop := roundDown(entryPrice - frozenAtr * atrStopMultiple)
+        float meanTarget = frozenMean > entryPrice ? frozenMean : entryPrice + frozenAtr * atrTargetMultiple
+        targetPrice := roundDown(math.min(meanTarget, entryPrice + frozenAtr * atrTargetMultiple))
+    else
+        initialStop := roundUp(entryPrice + frozenAtr * atrStopMultiple)
+        float meanTarget = frozenMean < entryPrice ? frozenMean : entryPrice - frozenAtr * atrTargetMultiple
+        targetPrice := roundUp(math.max(meanTarget, entryPrice - frozenAtr * atrTargetMultiple))
+
+    activeStop := initialStop
+    pendingSide := 0
+    pendingQuantity := 0
+    pendingAtr := na
+    pendingMean := na
+
+if strategy.position_size > 0
+    activeStop := initialStop
+    strategy.exit("MR-L-X", from_entry = "MR-L", stop = activeStop, limit = targetPrice, comment = "StatMR bracket")
+    if not na(zScore) and zScore <= -zStopThreshold
+        strategy.close("MR-L", comment = "Long structural Z stop")
+
+if strategy.position_size < 0
+    activeStop := initialStop
+    strategy.exit("MR-S-X", from_entry = "MR-S", stop = activeStop, limit = targetPrice, comment = "StatMR bracket")
+    if not na(zScore) and zScore >= zStopThreshold
+        strategy.close("MR-S", comment = "Short structural Z stop")
+
+// Submit at 15:45 so the intended modeled exit is the 15:50 open.
+if isFiveMinute and isExitOrderBar and strategy.position_size != 0
+    strategy.close_all(comment = "15:50 ET flat")
+
+// A market order should fill on the next bar. If the session ends before that,
+// remove stale state rather than carrying a phantom order into another session.
+if flat and pendingSide != 0 and not inRth
+    strategy.cancel(pendingSide == 1 ? "MR-L" : "MR-S")
+    pendingSide := 0
+    pendingQuantity := 0
+    pendingAtr := na
+    pendingMean := na
+
+if justExited
+    entryPrice := na
+    frozenAtr := na
+    frozenMean := na
+    initialStop := na
+    targetPrice := na
+    activeStop := na
+
+// Visual diagnostics
+plot(showMean and inRth ? emaState : na, "RTH EMA20 mean", color = color.new(color.blue, 0), linewidth = 2)
+plot(showMean and inRth and not na(emaState) and not na(standardDeviationState) ? emaState + zEntryThreshold * standardDeviationState : na, "Z entry upper band", color = color.new(color.orange, 60), linewidth = 1)
+plot(showMean and inRth and not na(emaState) and not na(standardDeviationState) ? emaState - zEntryThreshold * standardDeviationState : na, "Z entry lower band", color = color.new(color.teal, 60), linewidth = 1)
+plot(strategy.position_size != 0 ? activeStop : na, "Protective stop", color = color.new(color.red, 0), style = plot.style_linebr)
+plot(strategy.position_size != 0 ? targetPrice : na, "Mean/ATR target", color = color.new(color.green, 0), style = plot.style_linebr)
+
+bgcolor(inSignalWindow ? color.new(color.blue, 95) : na, title = "Signal window shading")
+plotshape(showSignals and signalPlacedThisBar and pendingSide == 1, title = "Long signal", style = shape.triangleup, location = location.belowbar, color = color.new(color.teal, 0), size = size.tiny, text = "L")
+plotshape(showSignals and signalPlacedThisBar and pendingSide == -1, title = "Short signal", style = shape.triangledown, location = location.abovebar, color = color.new(color.orange, 0), size = size.tiny, text = "S")
+plotshape(showSignals and justEntered and strategy.position_size > 0, title = "Long fill", style = shape.circle, location = location.belowbar, color = color.new(color.green, 0), size = size.tiny, text = "Fill")
+plotshape(showSignals and justEntered and strategy.position_size < 0, title = "Short fill", style = shape.circle, location = location.abovebar, color = color.new(color.red, 0), size = size.tiny, text = "Fill")
+
+alertcondition(longSignal, "StatMR long signal", "RangeLab StatMR long signal. This is a modeled research event, not a broker fill.")
+alertcondition(shortSignal, "StatMR short signal", "RangeLab StatMR short signal. This is a modeled research event, not a broker fill.")
+alertcondition(justEntered, "StatMR modeled fill", "RangeLab StatMR modeled fill. Verify the chart and broker before acting.")
+alertcondition(dailyHalted or totalHalted, "StatMR risk halt", "RangeLab StatMR risk guard halted new entries. Chart-bar surveillance is not guaranteed account protection.")
+
+// Status table
+var table status = table.new(position.top_right, 2, 14, border_width = 1)
+if showStatusTable and barstate.islast
+    bool tickMatches = math.abs(syminfo.mintick - tickSize) < tickSize * 0.01
+    string regime = na(adxState) ? "Warming" : adxState < adxThreshold ? "Ranging" : "Blocked"
+    string halt = totalHalted ? "TOTAL HALT" : dailyHalted ? "DAILY HALT" : "Allowed"
+
+    table.cell(status, 0, 0, "RangeLab StatMR", text_color = color.white, bgcolor = color.rgb(24, 58, 59))
+    table.cell(status, 1, 0, "CANDIDATE", text_color = color.rgb(185, 229, 215), bgcolor = color.rgb(24, 58, 59))
+    table.cell(status, 0, 1, "Chart", text_color = color.gray)
+    table.cell(status, 1, 1, isFiveMinute ? "5m OK" : "Use 5m", text_color = isFiveMinute ? color.green : color.red)
+    table.cell(status, 0, 2, "Symbol", text_color = color.gray)
+    table.cell(status, 1, 2, syminfo.ticker, text_color = color.white)
+    table.cell(status, 0, 3, "Tick grid", text_color = color.gray)
+    table.cell(status, 1, 3, str.tostring(tickSize) + (tickMatches ? " OK" : " CHECK"), text_color = tickMatches ? color.green : color.red)
+    table.cell(status, 0, 4, "RTH bars", text_color = color.gray)
+    table.cell(status, 1, 4, str.tostring(rthBars) + " / " + str.tostring(warmupRthBars), text_color = gatesReady ? color.green : color.orange)
+    table.cell(status, 0, 5, "Z-score", text_color = color.gray)
+    table.cell(status, 1, 5, na(zScore) ? "-" : str.tostring(zScore, "#.##"), text_color = not na(zScore) ? color.white : color.orange)
+    table.cell(status, 0, 6, "RSI / ADX", text_color = color.gray)
+    table.cell(status, 1, 6, (na(rsiValue) ? "-" : str.tostring(rsiValue, "#.##")) + " / " + (na(adxState) ? "-" : str.tostring(adxState, "#.##")), text_color = gatesReady ? color.white : color.orange)
+    table.cell(status, 0, 7, "Regime", text_color = color.gray)
+    table.cell(status, 1, 7, regime, text_color = regime == "Ranging" ? color.green : color.orange)
+    table.cell(status, 0, 8, "Session fills", text_color = color.gray)
+    table.cell(status, 1, 8, str.tostring(fillsToday) + " / " + str.tostring(maxDailyTrades), text_color = fillsToday > 0 ? color.orange : color.green)
+    table.cell(status, 0, 9, "Risk guard", text_color = color.gray)
+    table.cell(status, 1, 9, halt, text_color = halt == "Allowed" ? color.green : color.red)
+    table.cell(status, 0, 10, "Sizing", text_color = color.gray)
+    table.cell(status, 1, 10, instrument + " - " + str.tostring(maxContracts) + " max", text_color = color.white)
+    table.cell(status, 0, 11, "Costs", text_color = color.gray)
+    table.cell(status, 1, 11, "$" + str.tostring(feeReserve) + " fee + " + str.tostring(slippageReserve) + " tick/side", text_color = color.white)
+    table.cell(status, 0, 12, "Bar detail", text_color = color.gray)
+    table.cell(status, 1, 12, "Standard OHLC", text_color = color.orange)
+    table.cell(status, 0, 13, "Evidence", text_color = color.gray)
+    table.cell(status, 1, 13, "Preflight only", text_color = color.orange)

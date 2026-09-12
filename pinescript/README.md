@@ -5,6 +5,8 @@ Files:
 - `pinescript/RangeLab_ORB30R_Advanced.pine` - strategy source.
 - `pinescript/RangeLab_ORB30R_Manual.pdf` - user, testing, and walk-forward manual.
 - `pinescript/RangeLab_ORB30R_Manual.md` - editable manual source.
+- `pinescript/RangeLab_StatMR_Advanced.pine` - Strategy 2 candidate mean-reversion source.
+- `pinescript/RangeLab_StatMR_README.md` - Strategy 2 setup and evidence boundaries.
 
 This is an advanced TradingView **strategy script for research, backtesting, paper testing and alerts**. It is not a broker EA and does not place live orders.
 

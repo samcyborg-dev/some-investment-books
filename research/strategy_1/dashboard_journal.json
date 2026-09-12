@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "id": "0ac7ce2ad8094559ba8df5c66d1a7d84",
+    "title": "Next strategy handoff - Strategy 2 data gate",
+    "body": "Next recommended research track is Strategy 2: statistical Z-score mean reversion with an ADX regime filter. Do not run or publish performance results yet. First acquire an authorized, independent ES and MES five-minute dataset, create provenance and quality receipts, validate timestamps, sessions, duplicates, OHLC/tick integrity, volume warnings, and roll/adjustment treatment, then review the strategy's causal entry, exit, fee, integer-sizing, and risk-surveillance rules. No synthetic, vendor-variant, or live result is project-owned evidence until those gates pass.",
+    "category": "Research",
+    "session_date": "2026-09-12",
+    "created_at": "2026-09-12T07:51:07.550676+00:00"
+  },
+  {
+    "id": "637c064fecb044f0acd5828820260499",
+    "title": "Baseline v1 Week 1 - ES1! TradingView review",
+    "body": "User-supplied TradingView screenshots reviewed. Setup is operational: 5m OK, symbol ES1!, 0.25 tick grid OK, 1,524 RTH bars versus 250 warm-up, trailing disabled, Bar Magnifier disabled, and opening-range/session plots visible. The equity image appears to end near -67.35 for the displayed sample, but screenshots do not provide enough information for exact closed-trade count, win rate, profit factor, expectancy, or maximum drawdown. Classify as Baseline v1 - Week 1 forward observation; preliminary negative, sample insufficient. Do not change parameters or increase size. Archive Strategy Tester Overview, List of Trades, chart, inputs, costs, symbol and data source. Continue the same ES setup unchanged next week, record every session including no-trade days, then perform an operational audit after the first four-week block. Keep ES and MES separate and do not call ES1! modeled fills broker-validated. Formal walk-forward plan: prefer 12 weeks in-sample followed by 4 weeks out-of-sample, rolling by 4 weeks; use 8 weeks in-sample and 2 weeks out-of-sample only if history is limited. Never use sealed out-of-sample results to retune the same test.",
+    "category": "Review",
+    "session_date": "2026-09-12",
+    "created_at": "2026-09-12T07:51:07.537972+00:00"
+  }
+]
